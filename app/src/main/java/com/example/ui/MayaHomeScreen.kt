@@ -240,13 +240,13 @@ fun MayaHomeScreen(
                 onEnergyClick = { onCardClick("energy") }
             )
 
-            // 3. CENTERPIECE: MAYA COSMIC PLANET ORB WITH ANIMATIONS
+            // 3. CENTERPIECE: DYNAMIC MAYA ANIMATION (DEFAULT: MAYA 2047 3D COSMIC PLANET)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                MayaCosmicOrbView(
+                MayaDynamicOrbView(
                     state = zoyaState,
                     orbSize = orbSize
                 )

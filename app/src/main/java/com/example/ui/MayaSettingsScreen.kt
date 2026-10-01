@@ -42,6 +42,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -837,6 +839,21 @@ fun MayaAdvancedSettingsScreen(
     var apiKey by remember { mutableStateOf(prefs.getString("api_key", "") ?: "") }
     var isKeyVisible by remember { mutableStateOf(false) }
 
+    var selectedOrbStyle by remember {
+        mutableStateOf(prefs.getString("orb_style", "MAYA 2047") ?: "MAYA 2047")
+    }
+    var selectedOrbColor by remember {
+        mutableStateOf(prefs.getString("orb_color", "Persona") ?: "Persona")
+    }
+    var floatingOrbSize by remember {
+        mutableStateOf(prefs.getInt("floating_orb_size", 190))
+    }
+    var useOrbOnHome by remember {
+        mutableStateOf(prefs.getBoolean("use_orb_on_home", true))
+    }
+
+    val scrollState = rememberScrollState()
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -848,7 +865,7 @@ fun MayaAdvancedSettingsScreen(
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // TOP BAR: Back Arrow + "Advanced" matching 04.jpeg
+            // TOP BAR: Back Arrow + "Advanced" matching screenshot
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -877,90 +894,342 @@ fun MayaAdvancedSettingsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // SCROLLABLE CONTENT
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
 
-            // CARD CONTAINER MATCHING 04.jpeg
-            SettingsCardContainer {
-                Text(
-                    text = "Gemini API key 🔑",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Input box with lock icon / password dots
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF0F0A1A))
-                        .border(1.dp, Color(0xFF32254E), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                ) {
+                // 1. APPEARANCE CARD (MATCHING USER SCREENSHOT)
+                SettingsCardContainer {
+                    // Header: Sparkles badge + Appearance
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        BasicTextField(
-                            value = apiKey,
-                            onValueChange = { apiKey = it },
-                            singleLine = true,
-                            visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            textStyle = TextStyle(
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Normal
-                            ),
-                            cursorBrush = SolidColor(Color(0xFFFF4081)),
-                            modifier = Modifier.weight(1f),
-                            decorationBox = { innerTextField ->
-                                if (apiKey.isEmpty()) {
-                                    Text(
-                                        text = "AIzaSy...",
-                                        color = Color(0xFF6B6082),
-                                        fontSize = 15.sp
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        IconButton(
-                            onClick = { isKeyVisible = !isKeyVisible },
-                            modifier = Modifier.size(24.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF1E3A8A).copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (isKeyVisible) Icons.Default.Check else Icons.Default.Close,
-                                contentDescription = if (isKeyVisible) "Hide Key" else "Show Key",
-                                tint = Color(0xFFA89FC0),
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "Appearance",
+                                tint = Color(0xFF60A5FA),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Appearance",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "How Maya looks on screen",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // SECTION: Orb style
+                    Text(
+                        text = "Orb style",
+                        color = Color.White,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Horizontal Scrollable Row of 4 Premium Animated Orb Styles
+                    val orbStyles = listOf(
+                        Triple("MAYA 2047", "Her own neon ring", "cosmic"),
+                        Triple("Maya Nova", "", "nova"),
+                        Triple("J.A.R.V.I.S.", "", "jarvis"),
+                        Triple("Ultron", "", "ultron")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        orbStyles.forEach { (styleName, subtext, type) ->
+                            val isSelected = (selectedOrbStyle == styleName)
+                            val borderColor = if (isSelected) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.10f)
+                            val bgColor = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A)
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        selectedOrbStyle = styleName
+                                        prefs.edit().putString("orb_style", styleName).apply()
+                                        Toast.makeText(context, "$styleName animation activated! ✨", Toast.LENGTH_SHORT).show()
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(95.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(bgColor)
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = borderColor,
+                                            shape = RoundedCornerShape(16.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Mini Live Animated Preview
+                                    when (type) {
+                                        "nova" -> MayaNovaOrbView(state = com.example.live.ZoyaState.SPEAKING, orbSize = 56.dp)
+                                        "jarvis" -> JarvisOrbView(state = com.example.live.ZoyaState.SPEAKING, orbSize = 56.dp)
+                                        "ultron" -> UltronOrbView(state = com.example.live.ZoyaState.SPEAKING, orbSize = 56.dp)
+                                        else -> MayaCosmicOrbView(state = com.example.live.ZoyaState.SPEAKING, orbSize = 56.dp)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Text(
+                                    text = styleName,
+                                    color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                                if (subtext.isNotEmpty()) {
+                                    Text(
+                                        text = subtext,
+                                        color = Color(0xFF64748B),
+                                        fontSize = 9.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = Color.White.copy(alpha = 0.08f)
+                    )
+
+                    // SECTION: Colour
+                    Text(
+                        text = "Colour",
+                        color = Color.White,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val colorsList = listOf(
+                        Pair("Persona", Color(0xFF38BDF8)),
+                        Pair("Jarvis O...", Color(0xFFF59E0B)),
+                        Pair("Ultron B...", Color(0xFF00E5FF)),
+                        Pair("Neon", Color(0xFFFF2A85)),
+                        Pair("Emerald", Color(0xFF10B981))
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        colorsList.forEach { (cName, colorVal) ->
+                            val isColorSelected = selectedOrbColor == cName || (cName == "Persona" && selectedOrbColor.isBlank())
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.clickable {
+                                    selectedOrbColor = cName
+                                    prefs.edit().putString("orb_color", cName).apply()
+                                }
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (cName == "Neon") {
+                                                androidx.compose.ui.graphics.Brush.sweepGradient(
+                                                    listOf(Color(0xFFFF2A85), Color(0xFFA855F7), Color(0xFF38BDF8), Color(0xFFFF2A85))
+                                                )
+                                            } else {
+                                                SolidColor(colorVal)
+                                            }
+                                        )
+                                        .border(
+                                            width = if (isColorSelected) 2.5.dp else 1.dp,
+                                            color = if (isColorSelected) Color.White else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = cName,
+                                    color = if (isColorSelected) Color.White else Color(0xFF94A3B8),
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isColorSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = Color.White.copy(alpha = 0.08f)
+                    )
+
+                    // SECTION: Floating orb size
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Floating orb size",
+                            color = Color.White,
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "$floatingOrbSize dp",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Slider(
+                        value = floatingOrbSize.toFloat(),
+                        onValueChange = { newVal ->
+                            floatingOrbSize = newVal.toInt()
+                            prefs.edit().putInt("floating_orb_size", floatingOrbSize).apply()
+                        },
+                        valueRange = 140f..240f,
+                        steps = 10,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color(0xFF2563EB),
+                            inactiveTrackColor = Color(0xFF1E293B),
+                            activeTickColor = Color.White.copy(alpha = 0.6f),
+                            inactiveTickColor = Color(0xFF38BDF8).copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = Color.White.copy(alpha = 0.08f)
+                    )
+
+                    // SECTION: Use the orb on Home
+                    BehaviourToggleItem(
+                        title = "Use the orb on Home",
+                        subtitle = "Replace the character with the orb in your chosen style",
+                        checked = useOrbOnHome,
+                        onCheckedChange = { isChecked ->
+                            useOrbOnHome = isChecked
+                            prefs.edit().putBoolean("use_orb_on_home", isChecked).apply()
+                        }
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Pink pill button: "Save key" exactly matching 04.jpeg
-                Button(
-                    onClick = {
-                        prefs.edit().putString("api_key", apiKey.trim()).apply()
-                        Toast.makeText(context, "Gemini API key saved! 🔑", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
-                    shape = RoundedCornerShape(22.dp),
-                    modifier = Modifier.height(42.dp)
-                ) {
+                // 2. GEMINI API KEY CARD
+                SettingsCardContainer {
                     Text(
-                        text = "Save key",
+                        text = "Gemini API key 🔑",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Input box with lock icon / password dots
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF0F0A1A))
+                            .border(1.dp, Color(0xFF32254E), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BasicTextField(
+                                value = apiKey,
+                                onValueChange = { apiKey = it },
+                                singleLine = true,
+                                visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                textStyle = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Normal
+                                ),
+                                cursorBrush = SolidColor(Color(0xFFFF4081)),
+                                modifier = Modifier.weight(1f),
+                                decorationBox = { innerTextField ->
+                                    if (apiKey.isEmpty()) {
+                                        Text(
+                                            text = "AIzaSy...",
+                                            color = Color(0xFF6B6082),
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            IconButton(
+                                onClick = { isKeyVisible = !isKeyVisible },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isKeyVisible) Icons.Default.Check else Icons.Default.Close,
+                                    contentDescription = if (isKeyVisible) "Hide Key" else "Show Key",
+                                    tint = Color(0xFFA89FC0),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // Pink pill button: "Save key"
+                    Button(
+                        onClick = {
+                            prefs.edit().putString("api_key", apiKey.trim()).apply()
+                            Toast.makeText(context, "Gemini API key saved! 🔑", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
+                        shape = RoundedCornerShape(22.dp),
+                        modifier = Modifier.height(42.dp)
+                    ) {
+                        Text(
+                            text = "Save key",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

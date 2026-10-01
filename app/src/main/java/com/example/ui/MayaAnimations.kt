@@ -11,8 +11,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -24,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,8 +46,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.live.ZoyaState
 import kotlin.math.cos
 import kotlin.math.sin
@@ -934,4 +940,600 @@ fun MayaEdgeGlowOverlay(
         }
     }
 }
+
+/**
+ * Maya Nova Orb: High-Tech Quantum Arc Reactor HUD Centerpiece
+ * Features concentric rotating HUD gauge rings, scanning bright energy beam,
+ * glowing crosshairs, center "M.A.Y.A" title, and pulsing audio equalizer.
+ */
+@Composable
+fun MayaNovaOrbView(
+    state: ZoyaState,
+    modifier: Modifier = Modifier,
+    orbSize: Dp = 175.dp,
+    tintColor: Color = Color(0xFF00E5FF)
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "nova_orb_transition")
+
+    val outerRotate by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "outer_rotate"
+    )
+
+    val innerRotate by infiniteTransition.animateFloat(
+        initialValue = 360f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "inner_rotate"
+    )
+
+    val corePulse by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                if (state == ZoyaState.SPEAKING) 500 else if (state == ZoyaState.LISTENING) 800 else 2000,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "core_pulse"
+    )
+
+    val hoverOffset by infiniteTransition.animateFloat(
+        initialValue = -4f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "nova_hover"
+    )
+
+    Box(
+        modifier = modifier
+            .size(orbSize * 1.25f)
+            .offset(y = hoverOffset.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val baseRadius = size.minDimension * 0.38f
+
+            // Outer Soft Ambient Radial Glow
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        tintColor.copy(alpha = 0.28f * corePulse),
+                        Color(0xFF2563EB).copy(alpha = 0.15f * corePulse),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = baseRadius * 1.45f
+                ),
+                radius = baseRadius * 1.45f,
+                center = center
+            )
+
+            // Inner Dark Reactor Core Cavity
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF0F172A),
+                        Color(0xFF090D16),
+                        Color(0xFF030712)
+                    ),
+                    center = center,
+                    radius = baseRadius * 0.85f
+                ),
+                radius = baseRadius * 0.85f,
+                center = center
+            )
+
+            // 1. Outer Segmented Arc Ring (Clockwise)
+            rotate(degrees = outerRotate, pivot = center) {
+                // Segment 1 (Long Arc with Bright Sweep)
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            tintColor.copy(alpha = 0.2f),
+                            tintColor,
+                            Color.White,
+                            tintColor.copy(alpha = 0.3f)
+                        ),
+                        center = center
+                    ),
+                    startAngle = 0f,
+                    sweepAngle = 140f,
+                    useCenter = false,
+                    topLeft = Offset(center.x - baseRadius, center.y - baseRadius),
+                    size = Size(baseRadius * 2, baseRadius * 2),
+                    style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // Segment 2 (Shorter Opposing Arc)
+                drawArc(
+                    color = tintColor.copy(alpha = 0.85f),
+                    startAngle = 180f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    topLeft = Offset(center.x - baseRadius, center.y - baseRadius),
+                    size = Size(baseRadius * 2, baseRadius * 2),
+                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // Outer tick dots
+                for (i in 0 until 12) {
+                    val angle = i * 30.0
+                    val rad = Math.toRadians(angle)
+                    val dotDist = baseRadius * 1.14f
+                    val dx = center.x + dotDist * cos(rad).toFloat()
+                    val dy = center.y + dotDist * sin(rad).toFloat()
+                    drawCircle(
+                        color = if (i % 3 == 0) Color.White else tintColor.copy(alpha = 0.5f),
+                        radius = if (i % 3 == 0) 2.dp.toPx() else 1.2.dp.toPx(),
+                        center = Offset(dx, dy)
+                    )
+                }
+            }
+
+            // 2. Middle Counter-Rotating Holographic Ring
+            rotate(degrees = innerRotate, pivot = center) {
+                val midRadius = baseRadius * 0.72f
+                drawArc(
+                    color = Color(0xFF60A5FA).copy(alpha = 0.65f),
+                    startAngle = 45f,
+                    sweepAngle = 100f,
+                    useCenter = false,
+                    topLeft = Offset(center.x - midRadius, center.y - midRadius),
+                    size = Size(midRadius * 2, midRadius * 2),
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = Color(0xFFA855F7).copy(alpha = 0.55f),
+                    startAngle = 210f,
+                    sweepAngle = 80f,
+                    useCenter = false,
+                    topLeft = Offset(center.x - midRadius, center.y - midRadius),
+                    size = Size(midRadius * 2, midRadius * 2),
+                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // Crosshairs (+)
+                val crossDist = midRadius * 0.95f
+                val crossOffsets = listOf(
+                    Offset(center.x - crossDist, center.y),
+                    Offset(center.x + crossDist, center.y),
+                    Offset(center.x, center.y - crossDist),
+                    Offset(center.x, center.y + crossDist)
+                )
+                crossOffsets.forEach { pos ->
+                    val len = 3.5.dp.toPx()
+                    drawLine(Color.White.copy(alpha = 0.8f), Offset(pos.x - len, pos.y), Offset(pos.x + len, pos.y), 1.2.dp.toPx())
+                    drawLine(Color.White.copy(alpha = 0.8f), Offset(pos.x, pos.y - len), Offset(pos.x, pos.y + len), 1.2.dp.toPx())
+                }
+            }
+
+            // 3. Central Neon Ring Outline
+            val coreRingRadius = baseRadius * 0.55f
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    colors = listOf(tintColor, Color.White, tintColor),
+                    center = center
+                ),
+                radius = coreRingRadius,
+                center = center,
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+        }
+
+        // Center M.A.Y.A Text & Equalizer Waveform
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "M.A.Y.A",
+                color = Color.White,
+                fontSize = (orbSize.value * 0.09f).sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            // Mini Equalizer Bars
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val barHeights = listOf(4.dp, 8.dp, 12.dp, 16.dp, 10.dp, 6.dp, 3.dp)
+                barHeights.forEachIndexed { i, h ->
+                    val dynamicH = h * corePulse
+                    Box(
+                        modifier = Modifier
+                            .width(2.dp)
+                            .height(dynamicH)
+                            .background(tintColor, RoundedCornerShape(1.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * J.A.R.V.I.S. Orb: Iron Man Stark Industries 3D Holographic Amber Grid Sphere
+ * Features 3D rotating latitude & longitude grid lines, glowing data nodes, and golden particle halo.
+ */
+@Composable
+fun JarvisOrbView(
+    state: ZoyaState,
+    modifier: Modifier = Modifier,
+    orbSize: Dp = 175.dp,
+    tintColor: Color = Color(0xFFF59E0B)
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "jarvis_orb_transition")
+
+    val rotateY by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "jarvis_rotate_y"
+    )
+
+    val corePulse by infiniteTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                if (state == ZoyaState.SPEAKING) 450 else if (state == ZoyaState.LISTENING) 750 else 2400,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "jarvis_pulse"
+    )
+
+    val hoverOffset by infiniteTransition.animateFloat(
+        initialValue = -4f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "jarvis_hover"
+    )
+
+    Box(
+        modifier = modifier
+            .size(orbSize * 1.25f)
+            .offset(y = hoverOffset.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val sphereRadius = size.minDimension * 0.32f
+
+            // Golden Atmospheric Glow
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        tintColor.copy(alpha = 0.30f * corePulse),
+                        Color(0xFFEA580C).copy(alpha = 0.15f * corePulse),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = sphereRadius * 1.6f
+                ),
+                radius = sphereRadius * 1.6f,
+                center = center
+            )
+
+            // Inner Dark Core Cavity
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF1C1405),
+                        Color(0xFF0D0A03),
+                        Color.Black
+                    ),
+                    center = center,
+                    radius = sphereRadius
+                ),
+                radius = sphereRadius,
+                center = center
+            )
+
+            // 1. 3D Longitude Ellipses (Spinning around Y axis)
+            for (i in 0 until 6) {
+                val angleDeg = (rotateY + i * 30f) % 180f
+                val rad = Math.toRadians(angleDeg.toDouble())
+                val scaleX = kotlin.math.abs(cos(rad)).toFloat().coerceAtLeast(0.08f)
+
+                drawOval(
+                    color = tintColor.copy(alpha = if (scaleX > 0.5f) 0.75f else 0.40f),
+                    topLeft = Offset(center.x - sphereRadius * scaleX, center.y - sphereRadius),
+                    size = Size(sphereRadius * 2 * scaleX, sphereRadius * 2),
+                    style = Stroke(width = 1.3.dp.toPx())
+                )
+            }
+
+            // 2. 3D Latitude Rings
+            val latitudes = listOf(-0.65f, -0.35f, 0f, 0.35f, 0.65f)
+            latitudes.forEach { lat ->
+                val ringY = center.y + sphereRadius * lat
+                val ringRadX = sphereRadius * kotlin.math.sqrt((1f - lat * lat).coerceAtLeast(0f))
+                val ringRadY = ringRadX * 0.28f
+
+                drawOval(
+                    color = Color(0xFFFEF08A).copy(alpha = if (lat == 0f) 0.85f else 0.50f),
+                    topLeft = Offset(center.x - ringRadX, ringY - ringRadY),
+                    size = Size(ringRadX * 2, ringRadY * 2),
+                    style = Stroke(width = if (lat == 0f) 1.8.dp.toPx() else 1.1.dp.toPx())
+                )
+            }
+
+            // 3. Orbiting Data Halos & Particles
+            rotate(degrees = rotateY * 0.6f, pivot = center) {
+                drawOval(
+                    color = tintColor.copy(alpha = 0.35f),
+                    topLeft = Offset(center.x - sphereRadius * 1.35f, center.y - sphereRadius * 0.55f),
+                    size = Size(sphereRadius * 2.7f, sphereRadius * 1.1f),
+                    style = Stroke(width = 1.2.dp.toPx())
+                )
+
+                // Golden data nodes on halo
+                for (j in 0 until 4) {
+                    val angle = (rotateY * 1.2f + j * 90f) % 360f
+                    val rad = Math.toRadians(angle.toDouble())
+                    val nx = center.x + sphereRadius * 1.35f * cos(rad).toFloat()
+                    val ny = center.y + sphereRadius * 0.55f * sin(rad).toFloat()
+                    drawCircle(
+                        color = Color.White,
+                        radius = 2.2.dp.toPx(),
+                        center = Offset(nx, ny)
+                    )
+                    drawCircle(
+                        color = tintColor.copy(alpha = 0.5f),
+                        radius = 5.dp.toPx(),
+                        center = Offset(nx, ny)
+                    )
+                }
+            }
+        }
+
+        // Center J.A.R.V.I.S. Text
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "M.A.Y.A",
+                color = Color(0xFFFEF08A),
+                fontSize = (orbSize.value * 0.085f).sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 2.sp
+            )
+        }
+    }
+}
+
+/**
+ * Ultron Orb: Neural Cybernetic Polyhedron Matrix
+ * Features 3D rotating interconnected geometric nodes and luminous faceted polygon mesh lines.
+ */
+@Composable
+fun UltronOrbView(
+    state: ZoyaState,
+    modifier: Modifier = Modifier,
+    orbSize: Dp = 175.dp,
+    tintColor: Color = Color(0xFF00E5FF)
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ultron_orb_transition")
+
+    val rotateAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ultron_rotate"
+    )
+
+    val corePulse by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                if (state == ZoyaState.SPEAKING) 480 else if (state == ZoyaState.LISTENING) 800 else 2200,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ultron_pulse"
+    )
+
+    val hoverOffset by infiniteTransition.animateFloat(
+        initialValue = -4f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ultron_hover"
+    )
+
+    Box(
+        modifier = modifier
+            .size(orbSize * 1.25f)
+            .offset(y = hoverOffset.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val r = size.minDimension * 0.32f
+
+            // Cybernetic Ice-Blue Aura
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        tintColor.copy(alpha = 0.32f * corePulse),
+                        Color(0xFF1D4ED8).copy(alpha = 0.18f * corePulse),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = r * 1.55f
+                ),
+                radius = r * 1.55f,
+                center = center
+            )
+
+            // Dark Matrix Cavity
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF04182B),
+                        Color(0xFF020E1A),
+                        Color.Black
+                    ),
+                    center = center,
+                    radius = r
+                ),
+                radius = r,
+                center = center
+            )
+
+            // Polyhedron Vertices in 3D
+            val rawVertices = listOf(
+                Triple(0f, 0.9f, 0.4f),
+                Triple(0.85f, 0.3f, 0.4f),
+                Triple(0.52f, -0.75f, 0.4f),
+                Triple(-0.52f, -0.75f, 0.4f),
+                Triple(-0.85f, 0.3f, 0.4f),
+                Triple(0.45f, 0.55f, -0.6f),
+                Triple(0.72f, -0.3f, -0.6f),
+                Triple(0f, -0.85f, -0.6f),
+                Triple(-0.72f, -0.3f, -0.6f),
+                Triple(-0.45f, 0.55f, -0.6f),
+                Triple(0f, 0f, 0.95f),
+                Triple(0f, 0f, -0.95f)
+            )
+
+            val radRot = Math.toRadians(rotateAngle.toDouble())
+            val cosRot = cos(radRot).toFloat()
+            val sinRot = sin(radRot).toFloat()
+
+            // Rotate around Y and Z slightly
+            val projected = rawVertices.map { (vx, vy, vz) ->
+                val rx = vx * cosRot - vz * sinRot
+                val rz = vx * sinRot + vz * cosRot
+                val px = center.x + rx * r
+                val py = center.y + vy * r * 0.95f
+                Triple(px, py, rz)
+            }
+
+            // Draw Facet Connection Lines
+            val edges = listOf(
+                0 to 1, 1 to 2, 2 to 3, 3 to 4, 4 to 0,
+                5 to 6, 6 to 7, 7 to 8, 8 to 9, 9 to 5,
+                0 to 10, 1 to 10, 2 to 10, 3 to 10, 4 to 10,
+                5 to 11, 6 to 11, 7 to 11, 8 to 11, 9 to 11,
+                0 to 5, 1 to 6, 2 to 7, 3 to 8, 4 to 9
+            )
+
+            edges.forEach { (a, b) ->
+                val p1 = projected[a]
+                val p2 = projected[b]
+                val avgZ = (p1.third + p2.third) / 2f
+                val isFront = avgZ > 0f
+
+                drawLine(
+                    color = if (isFront) Color.White.copy(alpha = 0.85f) else tintColor.copy(alpha = 0.35f),
+                    start = Offset(p1.first, p1.second),
+                    end = Offset(p2.first, p2.second),
+                    strokeWidth = if (isFront) 1.6.dp.toPx() else 1.0.dp.toPx()
+                )
+            }
+
+            // Draw Glowing Nodes at Vertices
+            projected.forEach { (px, py, pz) ->
+                val isFront = pz > 0f
+                val nodeRad = if (isFront) 2.5.dp.toPx() else 1.5.dp.toPx()
+                drawCircle(
+                    color = if (isFront) Color.White else tintColor.copy(alpha = 0.6f),
+                    radius = nodeRad,
+                    center = Offset(px, py)
+                )
+            }
+        }
+
+        // Center M.A.Y.A Text
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "M.A.Y.A",
+                color = Color.White,
+                fontSize = (orbSize.value * 0.085f).sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 2.sp
+            )
+        }
+    }
+}
+
+/**
+ * Universal Dynamic Orb View: Renders the active orb style chosen in Settings (Appearance)
+ * Default is "MAYA 2047" (Our 3D Cosmic Celestial Planet with rings and moons).
+ */
+@Composable
+fun MayaDynamicOrbView(
+    state: ZoyaState,
+    modifier: Modifier = Modifier,
+    orbSize: Dp = 175.dp
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = androidx.compose.runtime.remember {
+        context.getSharedPreferences("ZoyaPrefs", android.content.Context.MODE_PRIVATE)
+    }
+    val currentStyle = prefs.getString("orb_style", "MAYA 2047") ?: "MAYA 2047"
+    val currentColor = prefs.getString("orb_color", "Persona") ?: "Persona"
+
+    val tintColor = when {
+        currentColor.contains("Jarvis", ignoreCase = true) -> Color(0xFFF59E0B)
+        currentColor.contains("Ultron", ignoreCase = true) -> Color(0xFF00E5FF)
+        currentColor.contains("Neon", ignoreCase = true) -> Color(0xFFFF2A85)
+        currentColor.contains("Emerald", ignoreCase = true) -> Color(0xFF10B981)
+        else -> Color(0xFF38BDF8)
+    }
+
+    when (currentStyle) {
+        "Maya Nova" -> {
+            MayaNovaOrbView(state = state, modifier = modifier, orbSize = orbSize, tintColor = tintColor)
+        }
+        "J.A.R.V.I.S." -> {
+            JarvisOrbView(state = state, modifier = modifier, orbSize = orbSize, tintColor = tintColor)
+        }
+        "Ultron" -> {
+            UltronOrbView(state = state, modifier = modifier, orbSize = orbSize, tintColor = tintColor)
+        }
+        else -> {
+            // Default: MAYA 2047 3D Cosmic Celestial Planet
+            MayaCosmicOrbView(state = state, modifier = modifier, orbSize = orbSize)
+        }
+    }
+}
+
 
