@@ -145,16 +145,17 @@ class ZoyaForegroundService : Service() {
 
     private fun startAudioPlaybackLoop() {
         isAudioPlaybackActive = true
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        scope.launch(Dispatchers.IO) {
             while (isActive && isAudioPlaybackActive) {
                 try {
-                    val data = audioOutputQueue.poll(50, java.util.concurrent.TimeUnit.MILLISECONDS)
-                    if (data != null) {
-                        if (audioTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
-                            audioTrack?.play()
-                        }
-                        audioTrack?.write(data, 0, data.size)
+                    // Instantaneous wake-up with 0ms delay as soon as audio arrives
+                    val data = audioOutputQueue.take()
+                    if (audioTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                        audioTrack?.play()
                     }
+                    audioTrack?.write(data, 0, data.size)
+                } catch (e: InterruptedException) {
+                    break
                 } catch (e: Exception) {
                     Log.e("ZoyaDiagnostic", "Playback loop error", e)
                 }
@@ -165,9 +166,9 @@ class ZoyaForegroundService : Service() {
     private fun initAudioTrack() {
         try {
             val minBuf = AudioTrack.getMinBufferSize(outputSampleRate, outChannelConfig, audioFormat)
-            val finalBuf = if (minBuf > 0) minBuf * 4 else 8192
+            val finalBuf = if (minBuf > 0) minBuf * 2 else 4096
             
-            audioTrack = AudioTrack.Builder()
+            val builder = AudioTrack.Builder()
                 .setAudioAttributes(
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
@@ -183,8 +184,12 @@ class ZoyaForegroundService : Service() {
                 )
                 .setBufferSizeInBytes(finalBuf)
                 .setTransferMode(AudioTrack.MODE_STREAM)
-                .build()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            }
                 
+            audioTrack = builder.build()
             audioTrack?.play()
             startAudioPlaybackLoop()
         } catch (e: Exception) {
@@ -208,9 +213,9 @@ class ZoyaForegroundService : Service() {
 
         try {
             val minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-            val finalBuf = if (minBuf > 0) minBuf * 4 else 8192
+            val finalBuf = if (minBuf > 0) minBuf * 2 else 4096
             
-            Log.i("ZoyaDiagnostic", "Starting microphone recording. bufSize=$finalBuf")
+            Log.i("ZoyaDiagnostic", "Starting low-latency microphone recording. bufSize=$finalBuf")
 
             val ctx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 createAttributionContext("zoya_audio")
@@ -230,8 +235,6 @@ class ZoyaForegroundService : Service() {
                 .setBufferSizeInBytes(finalBuf)
                 .build()
 
-
-
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e("ZoyaDiagnostic", "AudioRecord initialization failed!")
                 return
@@ -241,9 +244,8 @@ class ZoyaForegroundService : Service() {
             isRecording = true
 
             scope.launch(Dispatchers.IO) {
-                // Use a smaller fixed chunk size instead of the large buffer for reading
-                // 100ms of audio at 16kHz is 1600 samples
-                val chunkSize = 1600
+                // Ultra-low latency 40ms streaming chunk (640 samples at 16kHz)
+                val chunkSize = 640
                 val audioBuffer = ShortArray(chunkSize)
                 var readCount = 0
                 while (isActive && isRecording) {
@@ -261,7 +263,6 @@ class ZoyaForegroundService : Service() {
                     } catch (e: Exception) {
                         Log.e("ZoyaDiagnostic", "Error reading audio", e)
                     }
-                    // No delay needed here as audioRecord?.read is blocking
                 }
                 Log.i("ZoyaDiagnostic", "Microphone loop stopped.")
             }

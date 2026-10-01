@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -96,6 +97,7 @@ fun MayaPermissionsScreen(
 
     val micGranted = remember(refreshTrigger) { isPermissionGranted(Manifest.permission.RECORD_AUDIO) }
     val contactsGranted = remember(refreshTrigger) { isPermissionGranted(Manifest.permission.READ_CONTACTS) }
+    val smsGranted = remember(refreshTrigger) { isPermissionGranted(Manifest.permission.SEND_SMS) }
     val writeContactsGranted = remember(refreshTrigger) { isPermissionGranted(Manifest.permission.WRITE_CONTACTS) }
     val callGranted = remember(refreshTrigger) { isPermissionGranted(Manifest.permission.CALL_PHONE) }
     val locationGranted = remember(refreshTrigger) {
@@ -117,6 +119,9 @@ fun MayaPermissionsScreen(
         refreshTrigger++
     }
     val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        refreshTrigger++
+    }
+    val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         refreshTrigger++
     }
     val writeContactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -223,7 +228,18 @@ fun MayaPermissionsScreen(
                 onAllow = { contactsLauncher.launch(Manifest.permission.READ_CONTACTS) }
             )
 
-            // 3. Save Contacts
+            // 3. SMS (Matching User Screenshot)
+            PermissionItemCard(
+                icon = Icons.Default.Sms,
+                iconTint = Color(0xFF8B5CF6),
+                iconBgColor = Color(0xFF1E1435),
+                title = "SMS",
+                description = "So Maya can send text messages.",
+                isGranted = smsGranted,
+                onAllow = { smsLauncher.launch(Manifest.permission.SEND_SMS) }
+            )
+
+            // 4. Save Contacts
             PermissionItemCard(
                 icon = Icons.Default.PersonAdd,
                 iconTint = Color(0xFF10B981),

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -28,6 +29,15 @@ class ToolExecutionEngine(private val context: Context) {
                     val contactName = args["contactName"]?.jsonPrimitive?.content ?: return@withContext "Error: Missing contactName"
                     val message = args["message"]?.jsonPrimitive?.content ?: ""
                     sendWhatsApp(contactName, message)
+                }
+                "searchContactsForSms" -> {
+                    val contactName = args["contactName"]?.jsonPrimitive?.content ?: return@withContext "Error: Missing contactName"
+                    searchContactsForSms(contactName)
+                }
+                "sendSMS", "sendSms" -> {
+                    val recipient = args["recipient"]?.jsonPrimitive?.content ?: args["contactName"]?.jsonPrimitive?.content ?: return@withContext "Error: Missing recipient"
+                    val message = args["message"]?.jsonPrimitive?.content ?: ""
+                    sendSMS(recipient, message)
                 }
                 "sendGmail" -> {
                     val recipient = args["recipientEmail"]?.jsonPrimitive?.content ?: ""
@@ -230,6 +240,103 @@ class ToolExecutionEngine(private val context: Context) {
         } catch(e: Exception) {
              com.example.accessibility.ZoyaAccessibilityService.shouldAutoClick = false
              return "WhatsApp may not be installed."
+        }
+    }
+
+    private fun searchContactsForSms(name: String): String {
+        if (context.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return "ERROR: Missing READ_CONTACTS permission. Please ask user to grant Contacts permission in Settings."
+        }
+        val matches = findContacts(name)
+        if (matches.isEmpty()) {
+            return "No contacts found with name '$name'. Please ask the user to clarify the contact name or provide the phone number."
+        }
+        if (matches.size == 1) {
+            val contact = matches[0]
+            val digits = contact.second.filter { it.isDigit() }
+            val last4 = if (digits.length >= 4) digits.takeLast(4) else digits
+            return "Found 1 contact for '$name': ${contact.first} (ending in $last4, full: ${contact.second}). You can proceed to send the SMS."
+        }
+
+        // Multiple contacts found: format each with its last 4 digits
+        val formattedList = matches.take(5).mapIndexed { idx, pair ->
+            val digits = pair.second.filter { it.isDigit() }
+            val last4 = if (digits.length >= 4) digits.takeLast(4) else digits
+            "${idx + 1}. ${pair.first} ending in $last4"
+        }.joinToString(", ")
+
+        return "MULTIPLE CONTACTS FOUND (${matches.size} numbers): $formattedList. CRITICAL RULE: Speak the last 4 digits of these numbers to the user and ask which one to choose: 'Mujhe $name ke ${matches.size} numbers mile hain: [speak last 4 digits of each]. Kaunse number par SMS bheju?'"
+    }
+
+    private fun sendSMS(recipient: String, message: String): String {
+        if (recipient.isBlank()) {
+            return "ERROR: Missing recipient name or phone number."
+        }
+        if (message.isBlank()) {
+            return "ERROR: SMS message body cannot be empty."
+        }
+
+        // Resolve phone number
+        var targetNumber = ""
+        var targetName = recipient
+
+        // Check if recipient is purely last 4 digits
+        val digitsOnly = recipient.filter { it.isDigit() }
+        if (digitsOnly.length == 4) {
+            // Find contact whose number ends with these 4 digits
+            val allMatches = findContacts("")
+            val matched = allMatches.firstOrNull { it.second.filter { c -> c.isDigit() }.endsWith(digitsOnly) }
+            if (matched != null) {
+                targetNumber = matched.second
+                targetName = matched.first
+            }
+        }
+
+        if (targetNumber.isEmpty()) {
+            val isDirectNumber = recipient.count { it.isDigit() } >= 7 || recipient.startsWith("+")
+            if (isDirectNumber) {
+                targetNumber = recipient.replace(Regex("[^0-9+]"), "")
+            } else {
+                val matches = findContacts(recipient)
+                if (matches.isEmpty()) {
+                    return "Could not find a contact named '$recipient'. Please specify the phone number."
+                }
+                targetNumber = matches.first().second
+                targetName = matches.first().first
+            }
+        }
+
+        val cleanNumber = targetNumber.replace(Regex("[^0-9+]"), "")
+
+        // Check SEND_SMS permission
+        if (context.checkSelfPermission(android.Manifest.permission.SEND_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try {
+                val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    context.getSystemService(android.telephony.SmsManager::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.telephony.SmsManager.getDefault()
+                }
+
+                val parts = smsManager.divideMessage(message)
+                smsManager.sendMultipartTextMessage(cleanNumber, null, parts, null, null)
+                return "SMS successfully sent to $targetName ($cleanNumber): '$message'"
+            } catch (e: Exception) {
+                Log.e("ToolEngine", "SmsManager send error", e)
+            }
+        }
+
+        // Fallback: Open SMS intent with pre-filled message
+        try {
+            val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("smsto:$cleanNumber")
+                putExtra("sms_body", message)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(smsIntent)
+            return "Opened SMS app for $targetName ($cleanNumber) with typed message: '$message'"
+        } catch (e: Exception) {
+            return "Failed to send SMS to $targetName: ${e.message}"
         }
     }
 
