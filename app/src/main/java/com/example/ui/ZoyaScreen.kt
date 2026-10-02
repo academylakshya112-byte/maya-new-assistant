@@ -116,7 +116,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
     }
 
     var zoyaState by remember { mutableStateOf(ZoyaForegroundService.currentState) }
-    var serviceStarted by remember { mutableStateOf(ZoyaForegroundService.activeService != null) }
+    var serviceStarted by remember { mutableStateOf(ZoyaForegroundService.activeService != null && ZoyaForegroundService.currentState != ZoyaState.IDLE) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -134,7 +134,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
     LaunchedEffect(Unit) {
         ZoyaForegroundService.onStateChange = { state ->
             zoyaState = state
-            serviceStarted = (ZoyaForegroundService.activeService != null)
+            serviceStarted = (ZoyaForegroundService.activeService != null && state != ZoyaState.IDLE)
         }
     }
 
@@ -274,6 +274,12 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                                 Toast.makeText(context, "Weather error: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
+                    } else if (lower.contains("pappi") || lower.contains("chumma") || lower.contains("chhumma") || lower.contains("kiss")) {
+                        Toast.makeText(context, "Ummaah! 😘 Ye lo babu pappi!", Toast.LENGTH_SHORT).show()
+                        startOrToggleVoice()
+                    } else if (lower.contains("love you") || lower.contains("pyar karta hu") || lower.contains("pyar karti ho") || lower.contains("pyaar")) {
+                        Toast.makeText(context, "I love you too babu! 💖", Toast.LENGTH_SHORT).show()
+                        startOrToggleVoice()
                     } else {
                         Toast.makeText(context, "Starting Maya to reply...", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()

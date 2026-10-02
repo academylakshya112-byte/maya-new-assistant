@@ -233,6 +233,7 @@ fun MayaHomeScreen(
                 greeting = greeting,
                 userName = currentUserName,
                 zoyaState = zoyaState,
+                serviceStarted = serviceStarted,
                 weatherReport = weatherReport,
                 energyLevel = energyLevel,
                 isCompact = isCompact,
@@ -247,7 +248,7 @@ fun MayaHomeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 MayaDynamicOrbView(
-                    state = zoyaState,
+                    state = if (!serviceStarted) ZoyaState.IDLE else zoyaState,
                     orbSize = orbSize
                 )
             }
@@ -513,6 +514,7 @@ private fun GreetingSection(
     greeting: String,
     userName: String,
     zoyaState: ZoyaState,
+    serviceStarted: Boolean,
     weatherReport: WeatherReport?,
     energyLevel: Int,
     isCompact: Boolean = false,
@@ -547,25 +549,39 @@ private fun GreetingSection(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            val statusText = when (zoyaState) {
-                ZoyaState.LISTENING -> "Listening..."
-                ZoyaState.THINKING -> "Thinking..."
-                ZoyaState.SPEAKING -> "Speaking..."
-                else -> "Listening..."
+            val isMayaActive = serviceStarted && zoyaState != ZoyaState.IDLE
+            val (statusText, statusColor, dotColor) = when {
+                !serviceStarted -> Triple("Offline", Color(0xFF94A3B8), Color(0xFFCBD5E1))
+                zoyaState == ZoyaState.LISTENING -> Triple("Listening...", Color(0xFF0284C7), Color(0xFF00B4D8))
+                zoyaState == ZoyaState.THINKING -> Triple("Thinking...", Color(0xFF8B5CF6), Color(0xFFA855F7))
+                zoyaState == ZoyaState.SPEAKING -> Triple("Speaking...", Color(0xFF10B981), Color(0xFF34D399))
+                else -> Triple("Offline", Color(0xFF94A3B8), Color(0xFFCBD5E1))
             }
 
-            Text(
-                text = statusText,
-                color = Color(0xFF64748B),
-                fontSize = if (isCompact) 11.sp else 12.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(dotColor, CircleShape)
+                )
+
+                Text(
+                    text = statusText,
+                    color = statusColor,
+                    fontSize = if (isCompact) 11.sp else 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
 
             Spacer(modifier = Modifier.height(2.dp))
 
             // Animated waveform matching image style (dots on edges, vertical lines in center)
             MayaWaveformView(
-                state = zoyaState,
+                state = if (isMayaActive) zoyaState else ZoyaState.IDLE,
+                isActive = isMayaActive,
                 modifier = Modifier.padding(top = 1.dp)
             )
         }

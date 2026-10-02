@@ -715,15 +715,18 @@ private fun DrawScope.drawSatelliteSphere(
 @Composable
 fun MayaWaveformView(
     state: ZoyaState,
+    isActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val isRunning = isActive && state != ZoyaState.IDLE
     val infiniteTransition = rememberInfiniteTransition(label = "waveform_clean")
     val wavePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                if (state == ZoyaState.SPEAKING) 450
+                if (!isRunning) 4000
+                else if (state == ZoyaState.SPEAKING) 450
                 else if (state == ZoyaState.LISTENING) 700
                 else 1800,
                 easing = LinearEasing
@@ -750,18 +753,22 @@ fun MayaWaveformView(
                     modifier = Modifier
                         .padding(horizontal = 1.2.dp)
                         .size(2.2.dp)
-                        .background(Color(0xFF60A5FA).copy(alpha = 0.8f), CircleShape)
+                        .background(
+                            if (isRunning) Color(0xFF60A5FA).copy(alpha = 0.8f) else Color(0xFFCBD5E1),
+                            CircleShape
+                        )
                 )
             } else {
                 val centerWeight = 1f - kotlin.math.abs((normalizedIdx - 0.5f) * 2.2f)
                 val envelope = centerWeight.coerceIn(0.2f, 1f)
                 val sineVal = kotlin.math.abs(sin((wavePhase + normalizedIdx * 2f) * 2 * Math.PI.toFloat()))
 
-                val maxBarHeight = when (state) {
-                    ZoyaState.SPEAKING -> 22f
-                    ZoyaState.LISTENING -> 18f
-                    ZoyaState.THINKING -> 14f
-                    else -> 8f
+                val maxBarHeight = when {
+                    !isRunning -> 3f
+                    state == ZoyaState.SPEAKING -> 22f
+                    state == ZoyaState.LISTENING -> 18f
+                    state == ZoyaState.THINKING -> 14f
+                    else -> 3f
                 }
                 val minBarHeight = 3f
                 val heightDp = (minBarHeight + (maxBarHeight - minBarHeight) * sineVal * envelope).dp
@@ -772,13 +779,22 @@ fun MayaWaveformView(
                         .width(2.2.dp)
                         .height(heightDp)
                         .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF38BDF8),
-                                    Color(0xFF0284C7),
-                                    Color(0xFF2563EB)
+                            brush = if (isRunning) {
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF38BDF8),
+                                        Color(0xFF0284C7),
+                                        Color(0xFF2563EB)
+                                    )
                                 )
-                            ),
+                            } else {
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFFCBD5E1),
+                                        Color(0xFF94A3B8)
+                                    )
+                                )
+                            },
                             shape = RoundedCornerShape(1.5.dp)
                         )
                 )
@@ -842,17 +858,20 @@ fun PulsingMicButton(
             modifier = Modifier
                 .size(btnSize)
                 .shadow(
-                    elevation = 10.dp,
+                    elevation = if (isActive) 10.dp else 4.dp,
                     shape = CircleShape,
-                    spotColor = Color(0xFF0284C7),
-                    ambientColor = Color(0xFF38BDF8)
+                    spotColor = if (isActive) Color(0xFF0284C7) else Color(0x33000000),
+                    ambientColor = if (isActive) Color(0xFF38BDF8) else Color(0x1F000000)
                 )
                 .clip(CircleShape)
                 .background(
                     brush = Brush.verticalGradient(
-                        colors = listOf(
+                        colors = if (isActive) listOf(
                             Color(0xFF00B4D8),
                             Color(0xFF0077F6)
+                        ) else listOf(
+                            Color(0xFF64748B),
+                            Color(0xFF475569)
                         )
                     )
                 )
@@ -861,7 +880,7 @@ fun PulsingMicButton(
         ) {
             Icon(
                 imageVector = Icons.Default.Mic,
-                contentDescription = "Voice Listening Button",
+                contentDescription = if (isActive) "Voice Listening Active (Tap to Turn Off)" else "Maya is Off (Tap to Start)",
                 tint = Color.White,
                 modifier = Modifier.size(iconSize)
             )
