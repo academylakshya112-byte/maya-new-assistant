@@ -224,7 +224,7 @@ class ZoyaForegroundService : Service() {
             }
             audioRecord = AudioRecord.Builder()
                 .setContext(ctx)
-                .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+                .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
                 .setAudioFormat(
                     AudioFormat.Builder()
                         .setSampleRate(sampleRate)
@@ -271,39 +271,76 @@ class ZoyaForegroundService : Service() {
         }
     }
 
-    private var consecutiveLoudChunks = 0
+    private var isUserSpeaking = false
+    private var silenceChunkCount = 0
+    private var speechChunkCount = 0
     private var lastFlushTime = 0L
 
     private fun processAudio(buffer: ShortArray, length: Int) {
         val state = liveSessionManager.zoyaState.value
         
-        if (state != ZoyaState.IDLE) {
-            val prefs = getSharedPreferences("ZoyaPrefs", Context.MODE_PRIVATE)
-            val echoGuardEnabled = prefs.getBoolean("echo_guard", true)
-
-            // Echo Guard: When Maya is speaking, mute/suppress mic input so she doesn't reply to herself
-            if (state == ZoyaState.SPEAKING && echoGuardEnabled) {
-                // Check if user is speaking loudly to interrupt
-                var sum = 0L
-                for (i in 0 until length) {
-                    sum += abs(buffer[i].toLong())
-                }
-                val avg = if (length > 0) sum / length else 0
-                
-                // If user speaks loudly (e.g. interruption), forward it to interrupt; otherwise mute
-                if (avg > 3500) {
-                    liveSessionManager.sendAudioData(buffer, length)
-                }
-            } else {
-                // Send data to Gemini Live if session is active
-                liveSessionManager.sendAudioData(buffer, length)
-            }
-        } else {
-            // Reconnect if it disconnected unexpectedly
+        if (state == ZoyaState.IDLE) {
             val now = System.currentTimeMillis()
             if (now - lastFlushTime > 3000) {
                 lastFlushTime = now
                 liveSessionManager.startSession()
+            }
+            return
+        }
+
+        val prefs = getSharedPreferences("ZoyaPrefs", Context.MODE_PRIVATE)
+        val echoGuardEnabled = prefs.getBoolean("echo_guard", true)
+
+        var sum = 0L
+        for (i in 0 until length) {
+            sum += abs(buffer[i].toLong())
+        }
+        val avg = if (length > 0) sum / length else 0
+
+        // When Maya is speaking
+        if (state == ZoyaState.SPEAKING) {
+            if (echoGuardEnabled) {
+                // If user speaks loudly to interrupt Maya
+                if (avg > 3200) {
+                    liveSessionManager.sendAudioData(buffer, length)
+                }
+            } else {
+                liveSessionManager.sendAudioData(buffer, length)
+            }
+            isUserSpeaking = false
+            silenceChunkCount = 0
+            speechChunkCount = 0
+            return
+        }
+
+        // When Maya is listening or thinking
+        val isVoice = avg > 450
+        if (isVoice) {
+            speechChunkCount++
+            silenceChunkCount = 0
+            if (speechChunkCount >= 2) {
+                isUserSpeaking = true
+            }
+            liveSessionManager.sendAudioData(buffer, length)
+        } else {
+            speechChunkCount = 0
+            if (isUserSpeaking) {
+                silenceChunkCount++
+                // Stream trailing 200ms (5 chunks) so trailing consonants/words aren't cut off
+                if (silenceChunkCount <= 5) {
+                    liveSessionManager.sendAudioData(buffer, length)
+                } else if (silenceChunkCount == 6) {
+                    // Turn Complete! User just finished speaking!
+                    // Immediately signal end of turn to Gemini Live for instant ultra-fast reply!
+                    isUserSpeaking = false
+                    liveSessionManager.signalTurnComplete()
+                }
+            } else {
+                // Idle silence: send keepalive chunk every 160ms (every 4th chunk)
+                silenceChunkCount++
+                if (silenceChunkCount % 4 == 0) {
+                    liveSessionManager.sendAudioData(buffer, length)
+                }
             }
         }
     }
