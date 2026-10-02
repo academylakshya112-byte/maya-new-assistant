@@ -116,6 +116,9 @@ fun MayaSettingsScreen(
     var edgeGlowEnabled by remember {
         mutableStateOf(prefs.getBoolean("edge_glow", true))
     }
+    var edgeGlowStyle by remember {
+        mutableStateOf(prefs.getString("edge_glow_style", "Cyber Comet") ?: "Cyber Comet")
+    }
     var echoGuardEnabled by remember {
         mutableStateOf(prefs.getBoolean("echo_guard", true))
     }
@@ -346,6 +349,57 @@ fun MayaSettingsScreen(
                             prefs.edit().putBoolean("edge_glow", isChecked).apply()
                         }
                     )
+
+                    if (edgeGlowEnabled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Animation style:",
+                            color = Color(0xFFA89FC0),
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val edgeStyles = listOf(
+                            Pair("Cyber Comet", "⚡ Cyber Comet"),
+                            Pair("Aurora Flow", "🌈 Aurora Flow"),
+                            Pair("Dual Orbit", "💫 Dual Orbit"),
+                            Pair("Neon Pulse", "🌌 Neon Pulse")
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            edgeStyles.forEach { (styleKey, label) ->
+                                val isSelected = (edgeGlowStyle == styleKey)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0xFF2A1B4E) else Color(0xFF130D22))
+                                        .border(
+                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                            color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF2D204A),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            edgeGlowStyle = styleKey
+                                            prefs.edit().putString("edge_glow_style", styleKey).apply()
+                                            Toast.makeText(context, "$label activated!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(vertical = 8.dp, horizontal = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 12.dp),
@@ -851,6 +905,9 @@ fun MayaAdvancedSettingsScreen(
     var useOrbOnHome by remember {
         mutableStateOf(prefs.getBoolean("use_orb_on_home", true))
     }
+    var edgeGlowStyle by remember {
+        mutableStateOf(prefs.getString("edge_glow_style", "Cyber Comet") ?: "Cyber Comet")
+    }
 
     val scrollState = rememberScrollState()
 
@@ -1145,6 +1202,75 @@ fun MayaAdvancedSettingsScreen(
                             prefs.edit().putBoolean("use_orb_on_home", isChecked).apply()
                         }
                     )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = Color.White.copy(alpha = 0.08f)
+                    )
+
+                    // SECTION: Edge glow style
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Edge glow style",
+                            color = Color.White,
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = edgeGlowStyle,
+                            color = Color(0xFF38BDF8),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val advEdgeStyles = listOf(
+                        Pair("Cyber Comet", "⚡ Cyber Comet"),
+                        Pair("Aurora Flow", "🌈 Aurora Flow"),
+                        Pair("Dual Orbit", "💫 Dual Orbit"),
+                        Pair("Neon Pulse", "🌌 Neon Pulse")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        advEdgeStyles.forEach { (styleKey, label) ->
+                            val isSelected = (edgeGlowStyle == styleKey)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A))
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.1f),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        edgeGlowStyle = styleKey
+                                        prefs.edit().putString("edge_glow_style", styleKey).apply()
+                                        Toast.makeText(context, "$label activated!", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(vertical = 9.dp, horizontal = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // 2. GEMINI API KEY CARD

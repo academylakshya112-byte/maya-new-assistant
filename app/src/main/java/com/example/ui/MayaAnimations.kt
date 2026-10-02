@@ -35,17 +35,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -866,78 +870,323 @@ fun PulsingMicButton(
 }
 
 /**
- * Animated Neon Edge Glow frame around the screen while Maya is live.
- * Matches the Behaviour setting "Edge glow: Animated neon frame around the screen while Maya is live"
+ * Animated Neon Edge Glow frame perfectly fitted to the device's 4 edges and corners.
+ * Adapts to ANY screen size/aspect ratio without rotating across the screen.
+ * Supports multiple premium animation styles:
+ * - "Cyber Comet": High-velocity neon laser comet with fading tail running along the 4 borders
+ * - "Aurora Flow": Prismatic chromatic sweep gradient flowing seamlessly along the border
+ * - "Dual Orbit": Two opposing energy sparks racing around the perimeter and crossing at corners
+ * - "Neon Pulse": Synchronized rhythmic ambient neon breathing along all 4 edges and corners
  */
 @Composable
 fun MayaEdgeGlowOverlay(
     state: ZoyaState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    forcedStyle: String? = null
 ) {
     if (state == ZoyaState.IDLE) return
 
+    val context = LocalContext.current
+    val prefs = androidx.compose.runtime.remember {
+        context.getSharedPreferences("ZoyaPrefs", android.content.Context.MODE_PRIVATE)
+    }
+    val currentStyle = forcedStyle ?: prefs.getString("edge_glow_style", "Cyber Comet") ?: "Cyber Comet"
+
     val infiniteTransition = rememberInfiniteTransition(label = "edge_glow_transition")
-    val glowPhase by infiniteTransition.animateFloat(
+
+    // Comet 1 forward progress (0..1)
+    val cometProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (state == ZoyaState.SPEAKING) 2400 else if (state == ZoyaState.THINKING) 3000 else 3600,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "comet_progress"
+    )
+
+    // Comet 2 reverse progress (1..0) for Dual Orbit
+    val cometReverseProgress by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (state == ZoyaState.SPEAKING) 2700 else if (state == ZoyaState.THINKING) 3300 else 4000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "comet_reverse_progress"
+    )
+
+    // Aurora sweep angle phase (0..360)
+    val sweepAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
+            animation = tween(4500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "edge_glow_phase"
+        label = "sweep_angle"
     )
+
+    // Breathing glow alpha
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.55f,
         targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
+            animation = tween(
+                durationMillis = if (state == ZoyaState.SPEAKING) 700 else 1400,
+                easing = FastOutSlowInEasing
+            ),
             repeatMode = RepeatMode.Reverse
         ),
         label = "edge_glow_alpha"
     )
 
+    val pathMeasure = androidx.compose.runtime.remember { PathMeasure() }
+
     Canvas(modifier = modifier.fillMaxSize()) {
-        val strokeWidthPx = 4.dp.toPx()
-        val glowColorList = when (state) {
-            ZoyaState.SPEAKING -> listOf(
-                Color(0xFFFF2A85),
-                Color(0xFF9333EA),
-                Color(0xFF38BDF8),
-                Color(0xFFFF2A85)
-            )
-            ZoyaState.THINKING -> listOf(
-                Color(0xFFA855F7),
-                Color(0xFF6366F1),
-                Color(0xFF38BDF8),
-                Color(0xFFA855F7)
-            )
-            else -> listOf(
-                Color(0xFF00E5FF),
-                Color(0xFF2563EB),
-                Color(0xFF7C3AED),
-                Color(0xFF00E5FF)
-            )
+        val width = size.width
+        val height = size.height
+        if (width <= 0f || height <= 0f) return@Canvas
+
+        val cornerPx = 28.dp.toPx()
+        val marginPx = 2.dp.toPx()
+        val baseStrokeWidth = 3.dp.toPx()
+        val bloomStrokeWidth = 7.dp.toPx()
+
+        // Palette matching Maya's active state
+        val primaryColor: Color
+        val secondaryColor: Color
+        val accentColor: Color
+
+        when (state) {
+            ZoyaState.SPEAKING -> {
+                primaryColor = Color(0xFFFF2A85)   // Hot Electric Magenta
+                secondaryColor = Color(0xFF9333EA) // Cyber Purple
+                accentColor = Color(0xFF38BDF8)    // Neon Sky Cyan
+            }
+            ZoyaState.THINKING -> {
+                primaryColor = Color(0xFFA855F7)   // Quantum Violet
+                secondaryColor = Color(0xFF6366F1) // Indigo
+                accentColor = Color(0xFF00E5FF)    // Electric Cyan
+            }
+            else -> {
+                primaryColor = Color(0xFF00E5FF)   // Neon Cyan
+                secondaryColor = Color(0xFF2563EB) // Royal Blue
+                accentColor = Color(0xFF10B981)    // Emerald Glow
+            }
         }
 
-        rotate(degrees = glowPhase) {
-            // Soft outer neon glow
-            drawRect(
-                brush = Brush.sweepGradient(
-                    colors = glowColorList.map { it.copy(alpha = 0.35f * glowAlpha) }
-                ),
-                style = Stroke(width = 10.dp.toPx())
-            )
+        // Exact screen perimeter round-rect path locked to device edges
+        val rect = Rect(marginPx, marginPx, width - marginPx, height - marginPx)
+        val roundRect = RoundRect(rect, CornerRadius(cornerPx, cornerPx))
+        val perimeterPath = Path().apply {
+            addRoundRect(roundRect)
         }
 
-        rotate(degrees = glowPhase) {
-            // Inner crisp glowing border
-            drawRect(
-                brush = Brush.sweepGradient(
-                    colors = glowColorList.map { it.copy(alpha = 0.85f * glowAlpha) }
-                ),
-                style = Stroke(width = strokeWidthPx)
-            )
+        pathMeasure.setPath(perimeterPath, forceClosed = true)
+        val totalLength = pathMeasure.length
+        if (totalLength <= 0f) return@Canvas
+
+        // Helper function to draw an arc segment along the perimeter with wraparound support
+        fun drawPerimeterSegment(startDist: Float, endDist: Float, brush: Brush, strokeW: Float) {
+            val segStart = ((startDist % totalLength) + totalLength) % totalLength
+            val segEnd = ((endDist % totalLength) + totalLength) % totalLength
+
+            if (segStart < segEnd) {
+                val segPath = Path()
+                pathMeasure.getSegment(segStart, segEnd, segPath, startWithMoveTo = true)
+                drawPath(segPath, brush = brush, style = Stroke(width = strokeW, cap = StrokeCap.Round))
+            } else if (segStart > segEnd) {
+                val p1 = Path()
+                val p2 = Path()
+                pathMeasure.getSegment(segStart, totalLength, p1, startWithMoveTo = true)
+                pathMeasure.getSegment(0f, segEnd, p2, startWithMoveTo = true)
+                drawPath(p1, brush = brush, style = Stroke(width = strokeW, cap = StrokeCap.Round))
+                drawPath(p2, brush = brush, style = Stroke(width = strokeW, cap = StrokeCap.Round))
+            }
         }
+
+        when (currentStyle) {
+            "Aurora Flow" -> {
+                // Style 2: Smooth chromatic sweep gradient moving along the fixed rounded border
+                val centerOffset = Offset(width / 2f, height / 2f)
+                val auroraColors = listOf(
+                    primaryColor.copy(alpha = 0.9f * glowAlpha),
+                    secondaryColor.copy(alpha = 0.75f * glowAlpha),
+                    accentColor.copy(alpha = 0.9f * glowAlpha),
+                    Color(0xFFFBBF24).copy(alpha = 0.7f * glowAlpha),
+                    primaryColor.copy(alpha = 0.9f * glowAlpha)
+                )
+
+                // Soft outer ambient neon glow
+                drawRoundRect(
+                    brush = Brush.sweepGradient(auroraColors, center = centerOffset),
+                    topLeft = Offset(marginPx, marginPx),
+                    size = Size(width - 2 * marginPx, height - 2 * marginPx),
+                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                    style = Stroke(width = bloomStrokeWidth)
+                )
+
+                // Crisp inner border
+                drawRoundRect(
+                    brush = Brush.sweepGradient(auroraColors, center = centerOffset),
+                    topLeft = Offset(marginPx, marginPx),
+                    size = Size(width - 2 * marginPx, height - 2 * marginPx),
+                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                    style = Stroke(width = baseStrokeWidth)
+                )
+            }
+
+            "Dual Orbit" -> {
+                // Style 3: Two opposing energy comets racing around the screen perimeter
+                val cometLength = totalLength * 0.20f
+
+                // Comet 1: Clockwise (primaryColor)
+                val head1 = cometProgress * totalLength
+                val tail1 = head1 - cometLength
+                drawPerimeterSegment(
+                    startDist = tail1,
+                    endDist = head1,
+                    brush = Brush.linearGradient(listOf(primaryColor.copy(alpha = 0.1f), primaryColor.copy(alpha = 0.95f))),
+                    strokeW = bloomStrokeWidth
+                )
+                drawPerimeterSegment(
+                    startDist = tail1,
+                    endDist = head1,
+                    brush = Brush.linearGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White)),
+                    strokeW = baseStrokeWidth
+                )
+                val pos1 = pathMeasure.getPosition(head1 % totalLength)
+                drawCircle(Color.White, radius = 3.5.dp.toPx(), center = pos1)
+                drawCircle(primaryColor.copy(alpha = 0.6f * glowAlpha), radius = 7.dp.toPx(), center = pos1)
+
+                // Comet 2: Counter-Clockwise (secondaryColor / accentColor)
+                val head2 = cometReverseProgress * totalLength
+                val tail2 = head2 - cometLength
+                drawPerimeterSegment(
+                    startDist = tail2,
+                    endDist = head2,
+                    brush = Brush.linearGradient(listOf(accentColor.copy(alpha = 0.1f), accentColor.copy(alpha = 0.95f))),
+                    strokeW = bloomStrokeWidth
+                )
+                drawPerimeterSegment(
+                    startDist = tail2,
+                    endDist = head2,
+                    brush = Brush.linearGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White)),
+                    strokeW = baseStrokeWidth
+                )
+                val pos2 = pathMeasure.getPosition(((head2 % totalLength) + totalLength) % totalLength)
+                drawCircle(Color.White, radius = 3.5.dp.toPx(), center = pos2)
+                drawCircle(accentColor.copy(alpha = 0.6f * glowAlpha), radius = 7.dp.toPx(), center = pos2)
+            }
+
+            "Neon Pulse" -> {
+                // Style 4: Rhythmic breathing ambient neon glow hugging the 4 edges & corners
+                // Subtle dark ambient backdrop stroke
+                drawRoundRect(
+                    color = primaryColor.copy(alpha = 0.22f * glowAlpha),
+                    topLeft = Offset(marginPx, marginPx),
+                    size = Size(width - 2 * marginPx, height - 2 * marginPx),
+                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                    style = Stroke(width = bloomStrokeWidth * 1.5f)
+                )
+
+                // Primary glowing crisp stroke
+                drawRoundRect(
+                    color = primaryColor.copy(alpha = 0.85f * glowAlpha),
+                    topLeft = Offset(marginPx, marginPx),
+                    size = Size(width - 2 * marginPx, height - 2 * marginPx),
+                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                    style = Stroke(width = baseStrokeWidth)
+                )
+            }
+
+            else -> {
+                // Style 1 (DEFAULT): "Cyber Comet"
+                // A brilliant neon laser stream running continuously along the 4 borders
+                val cometLength = totalLength * 0.24f
+                val headDist = cometProgress * totalLength
+                val tailDist = headDist - cometLength
+
+                // 1. Subtle ambient base border around all 4 edges so screen is subtly framed
+                drawRoundRect(
+                    color = primaryColor.copy(alpha = 0.12f * glowAlpha),
+                    topLeft = Offset(marginPx, marginPx),
+                    size = Size(width - 2 * marginPx, height - 2 * marginPx),
+                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+
+                // 2. Soft glowing bloom tail
+                drawPerimeterSegment(
+                    startDist = tailDist,
+                    endDist = headDist,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            primaryColor.copy(alpha = 0.05f),
+                            secondaryColor.copy(alpha = 0.45f * glowAlpha),
+                            primaryColor.copy(alpha = 0.85f * glowAlpha)
+                        )
+                    ),
+                    strokeW = bloomStrokeWidth
+                )
+
+                // 3. Crisp bright laser core stream
+                drawPerimeterSegment(
+                    startDist = tailDist + (cometLength * 0.25f),
+                    endDist = headDist,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            primaryColor.copy(alpha = 0.3f),
+                            primaryColor,
+                            Color.White
+                        )
+                    ),
+                    strokeW = baseStrokeWidth
+                )
+
+                // 4. Brilliant Head Particle with radial halo
+                val headPos = pathMeasure.getPosition(headDist % totalLength)
+                drawCircle(
+                    color = Color.White,
+                    radius = 3.5.dp.toPx(),
+                    center = headPos
+                )
+                drawCircle(
+                    color = primaryColor.copy(alpha = 0.7f * glowAlpha),
+                    radius = 8.dp.toPx(),
+                    center = headPos
+                )
+            }
+        }
+
+        // Universal 4-Corner Futuristic Cyber Accents
+        // Enhances all 4 device corners with subtle luminous corner ticks
+        val cornerTickLen = 14.dp.toPx()
+        val cornerColor = Color.White.copy(alpha = 0.55f * glowAlpha)
+        val tickStroke = 2.dp.toPx()
+
+        // Top-Left Corner Bracket
+        drawLine(cornerColor, Offset(marginPx + cornerPx, marginPx), Offset(marginPx + cornerPx + cornerTickLen, marginPx), tickStroke)
+        drawLine(cornerColor, Offset(marginPx, marginPx + cornerPx), Offset(marginPx, marginPx + cornerPx + cornerTickLen), tickStroke)
+
+        // Top-Right Corner Bracket
+        drawLine(cornerColor, Offset(width - marginPx - cornerPx, marginPx), Offset(width - marginPx - cornerPx - cornerTickLen, marginPx), tickStroke)
+        drawLine(cornerColor, Offset(width - marginPx, marginPx + cornerPx), Offset(width - marginPx, marginPx + cornerPx + cornerTickLen), tickStroke)
+
+        // Bottom-Left Corner Bracket
+        drawLine(cornerColor, Offset(marginPx + cornerPx, height - marginPx), Offset(marginPx + cornerPx + cornerTickLen, height - marginPx), tickStroke)
+        drawLine(cornerColor, Offset(marginPx, height - marginPx - cornerPx), Offset(marginPx, height - marginPx - cornerPx - cornerTickLen), tickStroke)
+
+        // Bottom-Right Corner Bracket
+        drawLine(cornerColor, Offset(width - marginPx - cornerPx, height - marginPx), Offset(width - marginPx - cornerPx - cornerTickLen, height - marginPx), tickStroke)
+        drawLine(cornerColor, Offset(width - marginPx, height - marginPx - cornerPx), Offset(width - marginPx, height - marginPx - cornerPx - cornerTickLen), tickStroke)
     }
 }
 
