@@ -122,6 +122,12 @@ fun MayaSettingsScreen(
     var echoGuardEnabled by remember {
         mutableStateOf(prefs.getBoolean("echo_guard", true))
     }
+    var humanWorkingEnabled by remember {
+        mutableStateOf(prefs.getBoolean("human_working", false))
+    }
+    var bossRespectEnabled by remember {
+        mutableStateOf(prefs.getBoolean("boss_respect", true))
+    }
 
     var showAddContactDialog by remember { mutableStateOf(false) }
     var showAdvancedScreen by remember { mutableStateOf(false) }
@@ -414,6 +420,48 @@ fun MayaSettingsScreen(
                         onCheckedChange = { isChecked ->
                             echoGuardEnabled = isChecked
                             prefs.edit().putBoolean("echo_guard", isChecked).apply()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = Color.White.copy(alpha = 0.08f)
+                    )
+
+                    // 4. Human working
+                    BehaviourToggleItem(
+                        title = "Human working 🤖",
+                        subtitle = "Operate WhatsApp, SMS and apps like a real human: opens app, types character-by-character, and taps Send",
+                        checked = humanWorkingEnabled,
+                        onCheckedChange = { isChecked ->
+                            humanWorkingEnabled = isChecked
+                            prefs.edit().putBoolean("human_working", isChecked).apply()
+                            Toast.makeText(
+                                context,
+                                if (isChecked) "Human working mode enabled! 🤖" else "Instant mode enabled! ⚡",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = Color.White.copy(alpha = 0.08f)
+                    )
+
+                    // 5. Boss respect
+                    BehaviourToggleItem(
+                        title = "Boss respect 🛡️",
+                        subtitle = "If anyone abuses Maya's boss, she first politely warns them; if they persist, she defends her boss fiercely with sharp, savage retorts",
+                        checked = bossRespectEnabled,
+                        onCheckedChange = { isChecked ->
+                            bossRespectEnabled = isChecked
+                            prefs.edit().putBoolean("boss_respect", isChecked).apply()
+                            Toast.makeText(
+                                context,
+                                if (isChecked) "Boss respect & defense enabled! 🛡️" else "Boss respect disabled",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     )
                 }
@@ -908,6 +956,12 @@ fun MayaAdvancedSettingsScreen(
     var edgeGlowStyle by remember {
         mutableStateOf(prefs.getString("edge_glow_style", "Cyber Comet") ?: "Cyber Comet")
     }
+    var humanWorkingEnabled by remember {
+        mutableStateOf(prefs.getBoolean("human_working", false))
+    }
+    var bossRespectEnabled by remember {
+        mutableStateOf(prefs.getBoolean("boss_respect", true))
+    }
 
     val scrollState = rememberScrollState()
 
@@ -1354,6 +1408,130 @@ fun MayaAdvancedSettingsScreen(
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // 3. HUMAN WORKING CARD 🤖
+                SettingsCardContainer {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Human working",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (humanWorkingEnabled) Color(0xFF10B981).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (humanWorkingEnabled) "REAL HUMAN" else "INSTANT",
+                                        color = if (humanWorkingEnabled) Color(0xFF10B981) else Color(0xFF94A3B8),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Operate WhatsApp, SMS and apps like a real human: opens the app, opens/clicks contact, taps message box, types character-by-character, and taps Send.",
+                                color = Color(0xFFA89FC0),
+                                fontSize = 12.5.sp,
+                                lineHeight = 17.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Switch(
+                            checked = humanWorkingEnabled,
+                            onCheckedChange = { isChecked ->
+                                humanWorkingEnabled = isChecked
+                                prefs.edit().putBoolean("human_working", isChecked).apply()
+                                Toast.makeText(
+                                    context,
+                                    if (isChecked) "Human working mode enabled! 🤖" else "Instant mode enabled! ⚡",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFFF4081),
+                                uncheckedThumbColor = Color(0xFF94A3B8),
+                                uncheckedTrackColor = Color(0xFF261D3B)
+                            )
+                        )
+                    }
+                }
+
+                // 4. BOSS RESPECT CARD 🛡️
+                SettingsCardContainer {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Boss respect",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (bossRespectEnabled) Color(0xFFFF2A85).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (bossRespectEnabled) "PROTECTION ON" else "OFF",
+                                        color = if (bossRespectEnabled) Color(0xFFFF2A85) else Color(0xFF94A3B8),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Agar koi Maya ke boss ko apashabd ya gali deta hai, toh Maya pehle shanti aur pyar se samjhayegi. Fir bhi na maane toh boss ki izzat ke liye muh-tod savage jawab degi.",
+                                color = Color(0xFFA89FC0),
+                                fontSize = 12.5.sp,
+                                lineHeight = 17.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Switch(
+                            checked = bossRespectEnabled,
+                            onCheckedChange = { isChecked ->
+                                bossRespectEnabled = isChecked
+                                prefs.edit().putBoolean("boss_respect", isChecked).apply()
+                                Toast.makeText(
+                                    context,
+                                    if (isChecked) "Boss respect & defense enabled! 🛡️" else "Boss respect disabled",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFFF4081),
+                                uncheckedThumbColor = Color(0xFF94A3B8),
+                                uncheckedTrackColor = Color(0xFF261D3B)
+                            )
                         )
                     }
                 }

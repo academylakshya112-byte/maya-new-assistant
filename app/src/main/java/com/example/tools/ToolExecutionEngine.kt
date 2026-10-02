@@ -227,6 +227,26 @@ class ToolExecutionEngine(private val context: Context) {
         // We'll strip non-digits. (Country code may be required, assume it's attached or it will just try to prompt a chat)
         val cleanNumber = number.replace(Regex("[^0-9+]"), "")
         
+        val prefs = context.getSharedPreferences("ZoyaPrefs", Context.MODE_PRIVATE)
+        val isHumanWorking = prefs.getBoolean("human_working", false)
+
+        if (isHumanWorking) {
+            val url = "https://api.whatsapp.com/send?phone=$cleanNumber"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse(url)
+                setPackage("com.whatsapp")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                com.example.accessibility.ZoyaAccessibilityService.startHumanWorkingSend(message, "whatsapp")
+                context.startActivity(intent)
+                return "Human Working Mode: WhatsApp open karke message type aur send kiya ja raha hai."
+            } catch (e: Exception) {
+                com.example.accessibility.ZoyaAccessibilityService.isHumanWorking = false
+                return "WhatsApp may not be installed."
+            }
+        }
+
         val url = "https://api.whatsapp.com/send?phone=$cleanNumber&text=${Uri.encode(message)}"
         val intent = Intent(Intent.ACTION_VIEW)
         intent.data = Uri.parse(url)
@@ -307,6 +327,23 @@ class ToolExecutionEngine(private val context: Context) {
         }
 
         val cleanNumber = targetNumber.replace(Regex("[^0-9+]"), "")
+
+        val prefs = context.getSharedPreferences("ZoyaPrefs", Context.MODE_PRIVATE)
+        val isHumanWorking = prefs.getBoolean("human_working", false)
+
+        if (isHumanWorking) {
+            try {
+                val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("smsto:$cleanNumber")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                com.example.accessibility.ZoyaAccessibilityService.startHumanWorkingSend(message, "sms")
+                context.startActivity(smsIntent)
+                return "Human Working Mode: SMS app kholkar $targetName ko message type aur send kiya ja raha hai."
+            } catch (e: Exception) {
+                com.example.accessibility.ZoyaAccessibilityService.isHumanWorking = false
+            }
+        }
 
         // Check SEND_SMS permission
         if (context.checkSelfPermission(android.Manifest.permission.SEND_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {

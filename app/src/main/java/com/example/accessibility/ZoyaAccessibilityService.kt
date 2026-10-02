@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -14,6 +15,10 @@ import android.view.accessibility.AccessibilityNodeInfo
 class ZoyaAccessibilityService : AccessibilityService() {
 
     companion object {
+        var isHumanWorking = false
+        var humanTargetMessage = ""
+        var humanTargetApp = "whatsapp"
+
         var shouldAutoClick = false
             set(value) {
                 val becameTrue = value && !field
@@ -156,6 +161,145 @@ class ZoyaAccessibilityService : AccessibilityService() {
             }
             // Start checking after 300ms
             handler.postDelayed(checkRunnable, 300)
+        }
+
+        /**
+         * Human Working Mode: Operates like a real human!
+         * 1. Opens the chat / conversation.
+         * 2. Taps on the message input box.
+         * 3. Types the message character-by-character.
+         * 4. Locates and taps the Send button to send the message.
+         */
+        fun startHumanWorkingSend(message: String, appType: String = "whatsapp") {
+            isHumanWorking = true
+            humanTargetMessage = message
+            humanTargetApp = appType
+
+            val handler = Handler(Looper.getMainLooper())
+            val stepRunnable = object : Runnable {
+                var step = 1 // 1 = find & click input box, 2 = human typing, 3 = tap send
+                var attempts = 0
+                var typedLength = 0
+                var targetInputNode: AccessibilityNodeInfo? = null
+
+                override fun run() {
+                    attempts++
+                    if (!isHumanWorking) return
+
+                    val inst = instance ?: run {
+                        if (attempts < 30) handler.postDelayed(this, 300)
+                        else isHumanWorking = false
+                        return
+                    }
+
+                    val root = inst.rootInActiveWindow
+                    if (root == null) {
+                        if (attempts < 35) handler.postDelayed(this, 300)
+                        else isHumanWorking = false
+                        return
+                    }
+
+                    when (step) {
+                        1 -> {
+                            // Step 1: Find message input field & tap it
+                            val inputNode = findMessageInputField(root)
+                            if (inputNode != null) {
+                                targetInputNode = inputNode
+                                inst.performClick(inputNode)
+                                inputNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                                Log.d("ZoyaAccessibility", "Human Working: Focused message input box")
+                                step = 2
+                                typedLength = 0
+                                handler.postDelayed(this, 400) // Natural pause before human starts typing
+                            } else {
+                                if (attempts < 25) {
+                                    handler.postDelayed(this, 300)
+                                } else {
+                                    // Fallback: coordinate tap on bottom message input area
+                                    val metrics = inst.resources.displayMetrics
+                                    val clickX = metrics.widthPixels * 0.35f
+                                    val clickY = metrics.heightPixels * 0.94f
+                                    dispatchGestureClick(clickX, clickY)
+                                    step = 2
+                                    typedLength = 0
+                                    handler.postDelayed(this, 400)
+                                }
+                            }
+                        }
+                        2 -> {
+                            // Step 2: Human Typing - type character-by-character
+                            val inputNode = targetInputNode ?: findMessageInputField(root)
+                            if (typedLength < humanTargetMessage.length) {
+                                typedLength++
+                                val currentSlice = humanTargetMessage.substring(0, typedLength)
+                                if (inputNode != null) {
+                                    val bundle = Bundle().apply {
+                                        putCharSequence(
+                                            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                                            currentSlice
+                                        )
+                                    }
+                                    inputNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+                                }
+                                // Natural human typing cadence (40ms per character)
+                                handler.postDelayed(this, 40)
+                            } else {
+                                Log.d("ZoyaAccessibility", "Human Working: Typing finished! Waiting to tap Send...")
+                                step = 3
+                                handler.postDelayed(this, 400) // Human breath before clicking send
+                            }
+                        }
+                        3 -> {
+                            // Step 3: Find & tap Send button
+                            val clicked = inst.searchAndClickSendButton(root)
+                            if (!clicked) {
+                                val metrics = inst.resources.displayMetrics
+                                val clickX = metrics.widthPixels * 0.92f
+                                val clickYKeyboard = metrics.heightPixels * 0.58f
+                                val clickYBottom = metrics.heightPixels * 0.94f
+                                dispatchGestureClick(clickX, clickYKeyboard)
+                                dispatchGestureClick(clickX, clickYBottom)
+                            }
+                            Log.d("ZoyaAccessibility", "Human Working: Send button clicked!")
+                            isHumanWorking = false
+                        }
+                    }
+                }
+            }
+            // Give the app 600ms to open smoothly
+            handler.postDelayed(stepRunnable, 600)
+        }
+
+        private fun findMessageInputField(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+            val knownInputIds = listOf(
+                "com.whatsapp:id/entry",
+                "com.whatsapp:id/conversation_text_entry",
+                "com.whatsapp:id/input_edit_text",
+                "com.whatsapp.w4b:id/entry",
+                "com.google.android.apps.messaging:id/compose_message_text",
+                "com.android.mms:id/embedded_text_editor",
+                "com.samsung.android.messaging:id/message_edit_text"
+            )
+            for (id in knownInputIds) {
+                val nodes = root.findAccessibilityNodeInfosByViewId(id)
+                if (nodes.isNotEmpty()) return nodes[0]
+            }
+            return recursiveFindEditable(root)
+        }
+
+        private fun recursiveFindEditable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+            if (node.isEditable) return node
+            val className = node.className?.toString() ?: ""
+            if (className.contains("EditText")) return node
+
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i)
+                if (child != null) {
+                    val result = recursiveFindEditable(child)
+                    if (result != null) return result
+                }
+            }
+            return null
         }
 
         /**
