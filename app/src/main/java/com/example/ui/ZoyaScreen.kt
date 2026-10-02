@@ -280,6 +280,9 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                     } else if (lower.contains("love you") || lower.contains("pyar karta hu") || lower.contains("pyar karti ho") || lower.contains("pyaar")) {
                         Toast.makeText(context, "I love you too babu! 💖", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()
+                    } else if (lower.contains("gana gao") || lower.contains("gaana gao") || lower.contains("kuch gao") || lower.contains("sing")) {
+                        Toast.makeText(context, "Arey babu, aapke liye gaana ga rahi hu! 🎵", Toast.LENGTH_SHORT).show()
+                        startOrToggleVoice()
                     } else {
                         Toast.makeText(context, "Starting Maya to reply...", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()
