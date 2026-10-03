@@ -284,12 +284,6 @@ fun MayaHomeScreen(
                 modifier = Modifier.padding(bottom = 2.dp)
             )
 
-            // 4.6 FLOATING WEBSITE CODE STATUS PILL (Shows when Maya is coding or website is ready)
-            WebsiteFloatingStatusBar(
-                onExpandCodeView = { showFullscreenCodeModal = true },
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
             // 5. INPUT BAR: "Ask Maya anything..."
             BottomInputBar(
                 text = textInput,

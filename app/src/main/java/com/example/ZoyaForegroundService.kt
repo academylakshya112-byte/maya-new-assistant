@@ -93,19 +93,27 @@ class ZoyaForegroundService : Service() {
             }
             
             val onInterruptOut: () -> Unit = {
-                try {
-                    audioOutputQueue.clear()
-                    if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
-                        audioTrack?.pause()
-                        audioTrack?.flush()
-                        audioTrack?.play()
+                if (isUserIntentionalInterrupt) {
+                    try {
+                        audioOutputQueue.clear()
+                        if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                            audioTrack?.pause()
+                            audioTrack?.flush()
+                            audioTrack?.play()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ZoyaDiagnostic", "Error flushing track on interrupt", e)
                     }
-                } catch (e: Exception) {
-                    Log.e("ZoyaDiagnostic", "Error flushing track on interrupt", e)
+                    isMayaActuallySpeaking = false
+                    isServerTurnCompleted = false
+                    isUserIntentionalInterrupt = false
                 }
             }
             
             liveSessionManager = LiveSessionManager(this, toolEngine, onAudioOut, onInterruptOut)
+            liveSessionManager.onServerTurnComplete = {
+                isServerTurnCompleted = true
+            }
 
             createNotificationChannel()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -142,18 +150,34 @@ class ZoyaForegroundService : Service() {
 
     private val audioOutputQueue = java.util.concurrent.LinkedBlockingQueue<ByteArray>()
     private var isAudioPlaybackActive = false
+    @Volatile private var isMayaActuallySpeaking = false
+    @Volatile private var isServerTurnCompleted = false
+    @Volatile private var isUserIntentionalInterrupt = false
 
     private fun startAudioPlaybackLoop() {
         isAudioPlaybackActive = true
         scope.launch(Dispatchers.IO) {
             while (isActive && isAudioPlaybackActive) {
                 try {
-                    // Instantaneous wake-up with 0ms delay as soon as audio arrives
-                    val data = audioOutputQueue.take()
-                    if (audioTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
-                        audioTrack?.play()
+                    val data = audioOutputQueue.poll(150, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (data != null) {
+                        isMayaActuallySpeaking = true
+                        if (audioTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                            audioTrack?.play()
+                        }
+                        audioTrack?.write(data, 0, data.size)
+                    } else {
+                        // Queue is temporarily empty. Check if server completed turn
+                        if (isMayaActuallySpeaking && isServerTurnCompleted && audioOutputQueue.isEmpty()) {
+                            // Wait 350ms so AudioTrack hardware buffer drains and room reverberation decays
+                            kotlinx.coroutines.delay(350)
+                            if (audioOutputQueue.isEmpty()) {
+                                isMayaActuallySpeaking = false
+                                isServerTurnCompleted = false
+                                liveSessionManager.onPlaybackFinished()
+                            }
+                        }
                     }
-                    audioTrack?.write(data, 0, data.size)
                 } catch (e: InterruptedException) {
                     break
                 } catch (e: Exception) {
@@ -199,6 +223,8 @@ class ZoyaForegroundService : Service() {
 
     private fun playAudio(data: ByteArray) {
         try {
+            isMayaActuallySpeaking = true
+            isServerTurnCompleted = false
             audioOutputQueue.offer(data)
         } catch (e: Exception) {
             Log.e("ZoyaDiagnostic", "Error queueing audio", e)
@@ -238,6 +264,23 @@ class ZoyaForegroundService : Service() {
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e("ZoyaDiagnostic", "AudioRecord initialization failed!")
                 return
+            }
+
+            try {
+                if (android.media.audiofx.AcousticEchoCanceler.isAvailable()) {
+                    android.media.audiofx.AcousticEchoCanceler.create(audioRecord!!.audioSessionId)?.apply {
+                        enabled = true
+                        Log.i("ZoyaDiagnostic", "AcousticEchoCanceler enabled on microphone.")
+                    }
+                }
+                if (android.media.audiofx.NoiseSuppressor.isAvailable()) {
+                    android.media.audiofx.NoiseSuppressor.create(audioRecord!!.audioSessionId)?.apply {
+                        enabled = true
+                        Log.i("ZoyaDiagnostic", "NoiseSuppressor enabled on microphone.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ZoyaDiagnostic", "Audio effects init exception: ${e.message}")
             }
 
             audioRecord?.startRecording()
@@ -297,19 +340,22 @@ class ZoyaForegroundService : Service() {
         }
         val avg = if (length > 0) sum / length else 0
 
-        // When Maya is speaking
-        if (state == ZoyaState.SPEAKING) {
-            if (echoGuardEnabled) {
-                // If user speaks loudly to interrupt Maya
-                if (avg > 3200) {
+        // When Maya is speaking or draining audio queue through the phone speakers
+        if (isMayaActuallySpeaking || state == ZoyaState.SPEAKING) {
+            // Strictly guard against phone speaker echo:
+            // Do NOT stream speaker sound back to Gemini as user input.
+            // Only allow intentional user barge-in if user speaks loudly over the speaker (> 7500 amplitude)
+            if (avg > 7500) {
+                speechChunkCount++
+                if (speechChunkCount >= 3) {
+                    isUserIntentionalInterrupt = true
                     liveSessionManager.sendAudioData(buffer, length)
                 }
             } else {
-                liveSessionManager.sendAudioData(buffer, length)
+                speechChunkCount = 0
             }
             isUserSpeaking = false
             silenceChunkCount = 0
-            speechChunkCount = 0
             return
         }
 

@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         startDiagnosticLogging()
         com.example.media.MediaControlManager.init(this)
         com.example.brain.BrainEngine.init(this)
+        com.example.web.WebsiteBuilderManager.currentActivity = this
 
         setContent {
             MyApplicationTheme(darkTheme = false) {
@@ -90,6 +91,18 @@ class MainActivity : ComponentActivity() {
         
         if (missing.isNotEmpty()) {
             permissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.example.web.WebsiteBuilderManager.currentActivity = this
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (com.example.web.WebsiteBuilderManager.currentActivity == this) {
+            com.example.web.WebsiteBuilderManager.currentActivity = null
         }
     }
 }

@@ -96,7 +96,7 @@ fun MayaSettingsScreen(
         mutableStateOf(prefs.getString("persona_mode", "Maya 💕 (Girlfriend)") ?: "Maya 💕 (Girlfriend)")
     }
     var selectedVoice by remember {
-        mutableStateOf(prefs.getString("voice_name", "Aoede") ?: "Aoede")
+        mutableStateOf(prefs.getString("voice_name", "Kore") ?: "Kore")
     }
     var selectedLanguage by remember {
         mutableStateOf(prefs.getString("app_language", "Hinglish (Hindi + English) — default") ?: "Hinglish (Hindi + English) — default")
@@ -599,7 +599,7 @@ fun MayaSettingsScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    val voices = listOf("Aoede", "Kore", "Puck", "Charon", "Fenrir")
+                    val voices = listOf("Kore", "Aoede", "Puck", "Charon", "Fenrir")
                     SettingsDropdownField(
                         selectedValue = selectedVoice,
                         options = voices,

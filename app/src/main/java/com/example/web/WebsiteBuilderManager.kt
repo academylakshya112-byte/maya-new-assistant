@@ -24,6 +24,9 @@ import java.util.concurrent.TimeUnit
 
 object WebsiteBuilderManager {
     private const val TAG = "WebsiteBuilderManager"
+    @Volatile
+    var currentActivity: android.app.Activity? = null
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -582,35 +585,57 @@ object WebsiteBuilderManager {
 
     fun openInChrome(context: Context) {
         try {
-            val url = "http://127.0.0.1:${LocalWebPreviewServer.PORT}/"
-            val chromeIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            val targetContext = currentActivity ?: context
+            val port = LocalWebPreviewServer.actualPort
+            val url = "http://127.0.0.1:$port/"
+            val uri = Uri.parse(url)
+            Log.i(TAG, "Opening website in Chrome at $url")
 
-            // Try opening in Chrome specifically first
-            try {
-                chromeIntent.setPackage("com.android.chrome")
-                context.startActivity(chromeIntent)
-                return
-            } catch (e: Exception) {
-                chromeIntent.setPackage(null)
-            }
+            val chromePackages = listOf("com.android.chrome", "com.chrome.beta", "com.chrome.dev", "com.chrome.canary")
+            var launched = false
 
-            // Fallback to FileProvider file view if browser fails
-            val file = _latestFile.value
-            if (file != null && file.exists()) {
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                val fileIntent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "text/html")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            for (pkg in chromePackages) {
+                try {
+                    val chromeIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        setPackage(pkg)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    }
+                    try {
+                        targetContext.startActivity(chromeIntent)
+                        launched = true
+                        Log.i(TAG, "Directly launched Chrome with $pkg")
+                        break
+                    } catch (e: Exception) {
+                        val pi = android.app.PendingIntent.getActivity(
+                            targetContext,
+                            8765,
+                            chromeIntent,
+                            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                        )
+                        pi.send()
+                        launched = true
+                        Log.i(TAG, "Launched Chrome with $pkg via PendingIntent")
+                        break
+                    }
+                } catch (e: Exception) {
+                    Log.v(TAG, "Could not open with $pkg: ${e.message}")
                 }
-                context.startActivity(fileIntent)
-            } else {
-                context.startActivity(chromeIntent)
+            }
+
+            if (!launched) {
+                try {
+                    val genericIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    }
+                    targetContext.startActivity(genericIntent)
+                    launched = true
+                    Log.i(TAG, "Launched default browser for $url")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Default browser launch failed: ${e.message}")
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to launch Chrome: ${e.message}", e)
+            Log.e(TAG, "Failed in openInChrome: ${e.message}", e)
         }
     }
 
