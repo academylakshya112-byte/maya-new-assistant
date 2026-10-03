@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
@@ -49,6 +50,7 @@ sealed class SideMenuItem(
     val isHighlighted: Boolean = false
 ) {
     object Home : SideMenuItem("home", "Home", Icons.Default.Home, isHighlighted = true)
+    object MayaBrain : SideMenuItem("maya_brain", "Maya Brain 🧠", Icons.Default.Psychology, isHighlighted = true)
     object MayaHome : SideMenuItem("maya_home", "Maya Home", Icons.Default.Place)
     object LockSecurity : SideMenuItem("lock_security", "Lock & Security 🔐", Icons.Default.Security)
     object PersonaMode : SideMenuItem("persona_mode", "Persona Mode 🎭", Icons.Default.Mood)
@@ -135,6 +137,7 @@ fun MayaSideMenu(
 
             val menuItems = listOf(
                 SideMenuItem.Home,
+                SideMenuItem.MayaBrain,
                 SideMenuItem.MayaHome,
                 SideMenuItem.LockSecurity,
                 SideMenuItem.PersonaMode,

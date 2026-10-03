@@ -162,6 +162,8 @@ fun MayaHomeScreen(
         mutableStateOf(computeGreeting(initialCal.get(Calendar.HOUR_OF_DAY)))
     }
 
+    var showFullscreenCodeModal by remember { mutableStateOf(false) }
+
     // Auto-update greeting based on weather location time or live clock ticker
     LaunchedEffect(weatherReport) {
         while (true) {
@@ -206,6 +208,14 @@ fun MayaHomeScreen(
 
         // --- Ethereal Cosmic Flow Background matching reference image ---
         EtherealCosmicBackground(modifier = Modifier.fillMaxSize())
+
+        // --- GLOWING LIVE CODE MATRIX (Background Stream) ---
+        WebsiteBackgroundCodeMatrix(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = horizontalPadding, vertical = if (isCompact) 50.dp else 60.dp)
+        )
 
         Column(
             modifier = Modifier
@@ -269,6 +279,17 @@ fun MayaHomeScreen(
                 }
             )
 
+            // 4.5 COMPACT MEDIA CONTROL CARD (Shows when media is actively playing)
+            CompactMediaCard(
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+
+            // 4.6 FLOATING WEBSITE CODE STATUS PILL (Shows when Maya is coding or website is ready)
+            WebsiteFloatingStatusBar(
+                onExpandCodeView = { showFullscreenCodeModal = true },
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+
             // 5. INPUT BAR: "Ask Maya anything..."
             BottomInputBar(
                 text = textInput,
@@ -296,6 +317,13 @@ fun MayaHomeScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+
+    // Fullscreen Code View Modal when user taps expand
+    if (showFullscreenCodeModal) {
+        WebsiteFullscreenCodeModal(
+            onDismiss = { showFullscreenCodeModal = false }
+        )
     }
 
     // Interactive Weather Report Dialog for any location & current location

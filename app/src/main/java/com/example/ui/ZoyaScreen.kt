@@ -107,6 +107,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
     var showApiKeyPromptPopup by remember { mutableStateOf(false) }
     var showPersonaDialog by remember { mutableStateOf(false) }
     var isPermissionsOpen by remember { mutableStateOf(false) }
+    var isBrainOpen by remember { mutableStateOf(false) }
     var showInfoDialogTitle by remember { mutableStateOf<String?>(null) }
     var showInfoDialogBody by remember { mutableStateOf<String?>(null) }
     var isSettingsOpen by remember { mutableStateOf(false) }
@@ -188,9 +189,16 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                     onItemSelected = { item ->
                         coroutineScope.launch { drawerState.close() }
                         when (item) {
-                            SideMenuItem.Home -> { isSettingsOpen = false }
+                            SideMenuItem.Home -> { 
+                                isSettingsOpen = false
+                                isBrainOpen = false
+                            }
+                            SideMenuItem.MayaBrain -> {
+                                isBrainOpen = true
+                            }
                             SideMenuItem.MayaHome -> {
                                 isSettingsOpen = false
+                                isBrainOpen = false
                                 Toast.makeText(context, "Welcome Home with Maya 💖", Toast.LENGTH_SHORT).show()
                             }
                             SideMenuItem.LockSecurity -> {
@@ -227,7 +235,11 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
             }
         }
     ) {
-        if (isPermissionsOpen) {
+        if (isBrainOpen) {
+            MayaBrainScreen(
+                onBack = { isBrainOpen = false }
+            )
+        } else if (isPermissionsOpen) {
             MayaPermissionsScreen(
                 onBack = { isPermissionsOpen = false }
             )
@@ -274,12 +286,22 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                                 Toast.makeText(context, "Weather error: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
+                    } else if (lower.contains("time") || lower.contains("samay") || lower.contains("baje") || lower.contains("kitna baja") || lower.contains("kitne baje") || lower.contains("date") || lower.contains("tarikh") || lower.contains("taarikh") || lower.contains("kaun sa din") || lower.contains("kaunsa din")) {
+                        val now = java.util.Date()
+                        val timeStr = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(now)
+                        val dateStr = java.text.SimpleDateFormat("EEEE, dd MMMM yyyy", java.util.Locale.getDefault()).format(now)
+                        showInfoDialogTitle = "⏰ Device Local Time & Date"
+                        showInfoDialogBody = "Babu, abhi local time $timeStr ho rahe hain.\n\n📅 Date: $dateStr"
                     } else if (lower.contains("pappi") || lower.contains("chumma") || lower.contains("chhumma") || lower.contains("kiss")) {
                         Toast.makeText(context, "Ummaah! 😘 Ye lo babu pappi!", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()
                     } else if (lower.contains("love you") || lower.contains("pyar karta hu") || lower.contains("pyar karti ho") || lower.contains("pyaar")) {
                         Toast.makeText(context, "I love you too babu! 💖", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()
+                    } else if (lower.contains("website") || lower.contains("web site")) {
+                        Toast.makeText(context, "Maya is coding your website! 💻✨", Toast.LENGTH_SHORT).show()
+                        val isMod = lower.contains("badal") || lower.contains("change") || lower.contains("update") || lower.contains("modify")
+                        com.example.web.WebsiteBuilderManager.startBuild(context, query, query, isModification = isMod)
                     } else if (lower.contains("gana gao") || lower.contains("gaana gao") || lower.contains("kuch gao") || lower.contains("sing")) {
                         Toast.makeText(context, "Arey babu, aapke liye gaana ga rahi hu! 🎵", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()
@@ -337,8 +359,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                         showInfoDialogBody = "Visual Scanner is ready. Point at text, objects, or QR codes to analyze with Maya."
                     }
                     "memories" -> {
-                        showInfoDialogTitle = "💎 Memories Vault"
-                        showInfoDialogBody = "12 memories stored with Maya: Preferences, favorite study subjects, and music tracks remembered."
+                        isBrainOpen = true
                     }
                     "attach" -> {
                         Toast.makeText(context, "Attach photo or file for Maya", Toast.LENGTH_SHORT).show()

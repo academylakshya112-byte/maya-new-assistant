@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Sms
@@ -198,7 +199,7 @@ fun MayaPermissionsScreen(
             }
         }
 
-        // PERMISSIONS LIST (Hands-free complete setup card excluded as requested)
+        // PERMISSIONS LIST
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -206,7 +207,83 @@ fun MayaPermissionsScreen(
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. Microphone
+            // 1. SCREEN CAPTURE (PROMINENT TOP CARD WITH ICON BADGE & ALLOW BUTTON)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF150F25))
+                    .border(1.dp, Color(0xFF281C44), RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1E1435)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TouchApp,
+                            contentDescription = "Screen capture",
+                            tint = Color(0xFFA855F7),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Screen capture",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "So Maya can watch your screen live (screen share). She asks for this herself whenever she needs it — every time. You can also test it once here.",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.5.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Button(
+                        onClick = {
+                            if (!accessibilityGranted) {
+                                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                                android.widget.Toast.makeText(context, "Please enable Maya in Accessibility for Screen capture", android.widget.Toast.LENGTH_LONG).show()
+                            } else {
+                                android.widget.Toast.makeText(context, "Screen capture is active! Maya can watch screen live 📸✨", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF2A85)),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Allow",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // 2. Microphone
             PermissionItemCard(
                 icon = Icons.Default.Mic,
                 iconTint = Color(0xFF10B981),
@@ -217,7 +294,7 @@ fun MayaPermissionsScreen(
                 onAllow = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
             )
 
-            // 2. Contacts
+            // 3. Contacts
             PermissionItemCard(
                 icon = Icons.Default.Contacts,
                 iconTint = Color(0xFF10B981),
@@ -228,7 +305,7 @@ fun MayaPermissionsScreen(
                 onAllow = { contactsLauncher.launch(Manifest.permission.READ_CONTACTS) }
             )
 
-            // 3. SMS (Matching User Screenshot)
+            // 4. SMS (Matching User Screenshot)
             PermissionItemCard(
                 icon = Icons.Default.Sms,
                 iconTint = Color(0xFF8B5CF6),
@@ -239,7 +316,7 @@ fun MayaPermissionsScreen(
                 onAllow = { smsLauncher.launch(Manifest.permission.SEND_SMS) }
             )
 
-            // 4. Save Contacts
+            // 5. Save Contacts
             PermissionItemCard(
                 icon = Icons.Default.PersonAdd,
                 iconTint = Color(0xFF10B981),
@@ -250,7 +327,7 @@ fun MayaPermissionsScreen(
                 onAllow = { writeContactsLauncher.launch(Manifest.permission.WRITE_CONTACTS) }
             )
 
-            // 4. Phone calls
+            // 6. Phone calls
             PermissionItemCard(
                 icon = Icons.Default.Call,
                 iconTint = Color(0xFF10B981),
@@ -261,7 +338,7 @@ fun MayaPermissionsScreen(
                 onAllow = { callLauncher.launch(Manifest.permission.CALL_PHONE) }
             )
 
-            // 5. Location
+            // 7. Location
             PermissionItemCard(
                 icon = Icons.Default.LocationOn,
                 iconTint = Color(0xFFF59E0B),
@@ -279,11 +356,11 @@ fun MayaPermissionsScreen(
                 }
             )
 
-            // 6. Accessibility Service (WhatsApp Auto-Send)
+            // 8. Accessibility Service (WhatsApp Auto-Send & System Navigation)
             PermissionItemCard(
                 icon = Icons.Default.TouchApp,
-                iconTint = Color(0xFFA855F7),
-                iconBgColor = Color(0xFF26123D),
+                iconTint = Color(0xFFEC4899),
+                iconBgColor = Color(0xFF330D21),
                 title = "Accessibility Service",
                 description = "Allows Maya to automatically tap Send in WhatsApp and interact hands-free.",
                 isGranted = accessibilityGranted,
@@ -295,7 +372,7 @@ fun MayaPermissionsScreen(
                 }
             )
 
-            // 7. Notifications & Background
+            // 9. Notifications & Background
             PermissionItemCard(
                 icon = Icons.Default.Notifications,
                 iconTint = Color(0xFF38BDF8),
@@ -307,6 +384,25 @@ fun MayaPermissionsScreen(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
+                }
+            )
+
+            // 10. Media Controls & Track Info
+            val mediaAccessGranted = remember(refreshTrigger) {
+                com.example.media.MediaControlManager.isNotificationAccessGranted(context)
+            }
+            PermissionItemCard(
+                icon = Icons.Default.MusicNote,
+                iconTint = Color(0xFFA78BFA),
+                iconBgColor = Color(0xFF26123D),
+                title = "Media Controls & Track Info",
+                description = "Allows Maya to read song titles, album art and control media sessions live.",
+                isGranted = mediaAccessGranted,
+                onAllow = {
+                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
                 }
             )
 

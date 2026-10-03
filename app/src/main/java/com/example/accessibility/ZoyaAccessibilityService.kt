@@ -63,24 +63,505 @@ class ZoyaAccessibilityService : AccessibilityService() {
             return inst.dispatchGesture(gesture, null, null)
         }
 
-        fun clickTextOnScreen(text: String): Boolean {
-            val inst = instance ?: return false
-            val root = inst.rootInActiveWindow ?: return false
-            val nodes = root.findAccessibilityNodeInfosByText(text)
-            for (node in nodes) {
-                var current: AccessibilityNodeInfo? = node
-                while (current != null) {
-                    val bounds = Rect()
-                    current.getBoundsInScreen(bounds)
-                    if (!bounds.isEmpty && (current.isClickable || current == node)) {
-                        val x = bounds.centerX().toFloat()
-                        val y = bounds.centerY().toFloat()
-                        if (dispatchGestureClick(x, y)) return true
+        /**
+         * Toggles a Quick Settings tile (Wi-Fi, Bluetooth, Hotspot, Mobile Data)
+         * and instantly auto-closes the panel within ~200ms so the user screen stays clean!
+         */
+        fun toggleSettingTileDirectly(targetName: String, targetState: Boolean, onDone: (Boolean) -> Unit) {
+            val inst = instance ?: run {
+                onDone(false)
+                return
+            }
+
+            inst.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+            val handler = Handler(Looper.getMainLooper())
+
+            handler.postDelayed({
+                val root = inst.rootInActiveWindow
+                var clicked = false
+                if (root != null) {
+                    val searchKeywords = when (targetName.lowercase()) {
+                        "wifi", "wi-fi", "internet" -> listOf("wi-fi", "wifi", "internet", "wlan")
+                        "bluetooth", "bt" -> listOf("bluetooth", "bt")
+                        "hotspot", "tethering" -> listOf("hotspot", "tethering", "portable hotspot")
+                        "data", "mobile data" -> listOf("mobile data", "data", "cellular")
+                        "airplane", "flight" -> listOf("airplane", "flight mode")
+                        else -> listOf(targetName.lowercase())
                     }
-                    current = current.parent
+
+                    fun searchAndClickTile(node: AccessibilityNodeInfo): Boolean {
+                        val text = node.text?.toString()?.lowercase() ?: ""
+                        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+                        val matches = searchKeywords.any { kw -> text.contains(kw) || desc.contains(kw) }
+                        if (matches) {
+                            if (inst.performClick(node)) return true
+                        }
+                        for (i in 0 until node.childCount) {
+                            val c = node.getChild(i)
+                            if (c != null && searchAndClickTile(c)) return true
+                        }
+                        return false
+                    }
+
+                    clicked = searchAndClickTile(root)
+                }
+
+                // Immediately auto-close quick settings so user screen stays clean
+                handler.postDelayed({
+                    inst.performGlobalAction(GLOBAL_ACTION_BACK)
+                    handler.postDelayed({
+                        inst.performGlobalAction(GLOBAL_ACTION_BACK)
+                        onDone(clicked)
+                    }, 120)
+                }, 180)
+            }, 250)
+        }
+
+        /**
+         * WHATSAPP MESSAGE FLOW — MAYA (13-Step Strict Verified Automation)
+         */
+        fun executeWhatsAppMessageFlow(
+            context: android.content.Context,
+            contactName: String,
+            messageText: String,
+            onResult: (Boolean, String) -> Unit
+        ) {
+            val inst = instance ?: run {
+                onResult(false, "Accessibility Service is not active. Please enable Maya in Accessibility settings.")
+                return
+            }
+
+            // Step 1: Open WhatsApp
+            val pm = context.packageManager
+            var launchIntent = pm.getLaunchIntentForPackage("com.whatsapp")
+            if (launchIntent == null) {
+                launchIntent = pm.getLaunchIntentForPackage("com.whatsapp.w4b")
+            }
+            if (launchIntent == null) {
+                onResult(false, "WhatsApp is not installed on this device.")
+                return
+            }
+            launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launchIntent)
+
+            val handler = Handler(Looper.getMainLooper())
+
+            val flowRunnable = object : Runnable {
+                var step = 1 // 1: Wait App, 2: Check Chats, 3: Select Contact, 4: Search Contact, 5: Pick Result, 6: Locate Input, 7: Input Unicode, 8: Send, 9: Verify
+                var stepAttempts = 0
+                var totalAttempts = 0
+                var isFinished = false
+
+                fun finish(success: Boolean, resultMsg: String) {
+                    if (isFinished) return
+                    isFinished = true
+                    step = 99
+                    onResult(success, resultMsg)
+                }
+
+                override fun run() {
+                    if (isFinished) return
+                    totalAttempts++
+                    stepAttempts++
+
+                    if (totalAttempts > 75) {
+                        finish(false, "WhatsApp message flow timed out. Message was not confirmed as sent.")
+                        return
+                    }
+
+                    val service = instance
+                    if (service == null) {
+                        finish(false, "Accessibility service disconnected.")
+                        return
+                    }
+
+                    val root = service.rootInActiveWindow
+                    if (root == null) {
+                        handler.postDelayed(this, 350)
+                        return
+                    }
+
+                    val pkg = root.packageName?.toString() ?: ""
+                    if (!pkg.contains("whatsapp")) {
+                        if (stepAttempts < 15) {
+                            handler.postDelayed(this, 350)
+                        } else {
+                            finish(false, "Could not bring WhatsApp to foreground.")
+                        }
+                        return
+                    }
+
+                    when (step) {
+                        1 -> {
+                            // Step 1: App opened, wait for UI
+                            step = 2
+                            stepAttempts = 0
+                            handler.postDelayed(this, 500)
+                        }
+
+                        2 -> {
+                            // Step 2: Check if target chat is already open OR visible on Chats screen
+                            val isAlreadyInChat = findMessageInputField(root) != null && 
+                                (service.findChatHeaderTitle(root).contains(contactName, ignoreCase = true) || contactName.isBlank())
+
+                            if (isAlreadyInChat) {
+                                Log.d("ZoyaAccessibility", "WhatsApp: Already in chat for $contactName")
+                                step = 6
+                                stepAttempts = 0
+                                handler.postDelayed(this, 300)
+                                return
+                            }
+
+                            // Check visible chats list
+                            val directChatNode = service.findChatRowByName(root, contactName)
+                            if (directChatNode != null) {
+                                Log.d("ZoyaAccessibility", "WhatsApp: Found direct chat for $contactName")
+                                service.performClick(directChatNode)
+                                step = 6
+                                stepAttempts = 0
+                                handler.postDelayed(this, 600)
+                                return
+                            }
+
+                            // Step 3: Not visible -> tap bottom-right green New Chat (+) button
+                            val fab = service.findNewChatFab(root)
+                            if (fab != null) {
+                                Log.d("ZoyaAccessibility", "WhatsApp: Tapping New Chat FAB")
+                                service.performClick(fab)
+                                step = 3
+                                stepAttempts = 0
+                                handler.postDelayed(this, 600)
+                                return
+                            }
+
+                            if (stepAttempts in listOf(4, 7)) {
+                                val metrics = service.resources.displayMetrics
+                                dispatchGestureClick(metrics.widthPixels * 0.88f, metrics.heightPixels * 0.88f)
+                                step = 3
+                                stepAttempts = 0
+                                handler.postDelayed(this, 600)
+                                return
+                            }
+
+                            if (stepAttempts < 12) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                step = 3
+                                stepAttempts = 0
+                                handler.postDelayed(this, 400)
+                            }
+                        }
+
+                        3 -> {
+                            // Step 4: "Select contact" screen -> tap top-right Search icon
+                            val searchBtn = service.findSearchButton(root)
+                            if (searchBtn != null) {
+                                Log.d("ZoyaAccessibility", "WhatsApp: Tapping Search icon")
+                                service.performClick(searchBtn)
+                                step = 4
+                                stepAttempts = 0
+                                handler.postDelayed(this, 400)
+                                return
+                            }
+
+                            val searchField = service.findSearchField(root)
+                            if (searchField != null) {
+                                step = 4
+                                stepAttempts = 0
+                                handler.postDelayed(this, 300)
+                                return
+                            }
+
+                            if (stepAttempts in listOf(3, 6)) {
+                                val metrics = service.resources.displayMetrics
+                                dispatchGestureClick(metrics.widthPixels * 0.88f, metrics.heightPixels * 0.06f)
+                                step = 4
+                                stepAttempts = 0
+                                handler.postDelayed(this, 500)
+                                return
+                            }
+
+                            if (stepAttempts < 10) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                step = 4
+                                stepAttempts = 0
+                                handler.postDelayed(this, 400)
+                            }
+                        }
+
+                        4 -> {
+                            // Step 5: Type recipient's exact name into search field
+                            val searchField = service.findSearchField(root)
+                            if (searchField != null) {
+                                val bundle = Bundle().apply {
+                                    putCharSequence(
+                                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                                        contactName
+                                    )
+                                }
+                                searchField.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+                                Log.d("ZoyaAccessibility", "WhatsApp: Typed contact '$contactName' in search")
+                                step = 5
+                                stepAttempts = 0
+                                handler.postDelayed(this, 800)
+                                return
+                            }
+
+                            if (stepAttempts < 8) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                step = 5
+                                stepAttempts = 0
+                                handler.postDelayed(this, 500)
+                            }
+                        }
+
+                        5 -> {
+                            // Step 6: Identify & tap exact matching contact from search results
+                            val matches = service.findMatchingContactsInPicker(root, contactName)
+                            if (matches.isNotEmpty()) {
+                                Log.d("ZoyaAccessibility", "WhatsApp: Tapping matching contact")
+                                service.performClick(matches.first())
+                                step = 6
+                                stepAttempts = 0
+                                handler.postDelayed(this, 700)
+                                return
+                            }
+
+                            val textNodes = root.findAccessibilityNodeInfosByText(contactName)
+                            for (n in textNodes) {
+                                if (n.className?.toString()?.contains("EditText") != true) {
+                                    if (service.performClick(n)) {
+                                        Log.d("ZoyaAccessibility", "WhatsApp: Clicked contact by text")
+                                        step = 6
+                                        stepAttempts = 0
+                                        handler.postDelayed(this, 700)
+                                        return
+                                    }
+                                }
+                            }
+
+                            if (stepAttempts < 12) {
+                                handler.postDelayed(this, 400)
+                            } else {
+                                finish(false, "Could not find contact '$contactName' in WhatsApp search results.")
+                            }
+                        }
+
+                        6 -> {
+                            // Step 7: Chat open -> locate "Message" input field and focus/tap
+                            val inputNode = findMessageInputField(root)
+                            if (inputNode != null) {
+                                service.performClick(inputNode)
+                                inputNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                                Log.d("ZoyaAccessibility", "WhatsApp: Focused Message input field")
+                                step = 7
+                                stepAttempts = 0
+                                handler.postDelayed(this, 400)
+                                return
+                            }
+
+                            if (stepAttempts in listOf(4, 7)) {
+                                val metrics = service.resources.displayMetrics
+                                dispatchGestureClick(metrics.widthPixels * 0.35f, metrics.heightPixels * 0.94f)
+                                step = 7
+                                stepAttempts = 0
+                                handler.postDelayed(this, 400)
+                                return
+                            }
+
+                            if (stepAttempts < 15) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                finish(false, "Could not locate Message input field in WhatsApp chat.")
+                            }
+                        }
+
+                        7 -> {
+                            // Step 8 & 9: Input message Unicode-safely (preserve Hindi, English, emoji, special chars)
+                            val inputNode = findMessageInputField(root)
+                            if (inputNode != null) {
+                                val bundle = Bundle().apply {
+                                    putCharSequence(
+                                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                                        messageText
+                                    )
+                                }
+                                val ok = inputNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+                                Log.d("ZoyaAccessibility", "WhatsApp: Unicode text set ($ok): '$messageText'")
+                                step = 8
+                                stepAttempts = 0
+                                handler.postDelayed(this, 450)
+                                return
+                            }
+
+                            if (stepAttempts < 8) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                step = 8
+                                stepAttempts = 0
+                                handler.postDelayed(this, 400)
+                            }
+                        }
+
+                        8 -> {
+                            // Step 10: Locate & tap green Send arrow
+                            val clicked = service.searchAndClickSendButton(root)
+                            if (clicked) {
+                                Log.d("ZoyaAccessibility", "WhatsApp: Send arrow clicked!")
+                                step = 9
+                                stepAttempts = 0
+                                handler.postDelayed(this, 600)
+                                return
+                            }
+
+                            if (stepAttempts in listOf(2, 4, 6)) {
+                                val metrics = service.resources.displayMetrics
+                                val clickX = metrics.widthPixels * 0.92f
+                                dispatchGestureClick(clickX, metrics.heightPixels * 0.58f)
+                                dispatchGestureClick(clickX, metrics.heightPixels * 0.94f)
+                                step = 9
+                                stepAttempts = 0
+                                handler.postDelayed(this, 600)
+                                return
+                            }
+
+                            if (stepAttempts < 10) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                step = 9
+                                stepAttempts = 0
+                                handler.postDelayed(this, 500)
+                            }
+                        }
+
+                        9 -> {
+                            // Step 11, 12, 13: Post-Send Verification
+                            val inputNode = findMessageInputField(root)
+                            val inputText = inputNode?.text?.toString() ?: ""
+                            val isInputCleared = inputText.isBlank() || inputText != messageText
+                            val isBubbleVerified = service.verifyOutgoingMessageBubble(root, messageText)
+
+                            Log.d("ZoyaAccessibility", "WhatsApp Verify: inputCleared=$isInputCleared, bubbleVerified=$isBubbleVerified (attempt $stepAttempts)")
+
+                            if (isBubbleVerified && isInputCleared) {
+                                // Step 12: Success verified!
+                                finish(true, "Message sent successfully.")
+                                return
+                            }
+
+                            if (stepAttempts < 10) {
+                                handler.postDelayed(this, 350)
+                            } else {
+                                if (isInputCleared) {
+                                    finish(true, "Message sent successfully.")
+                                } else {
+                                    // Step 13: Verification failed/uncertain
+                                    finish(false, "Failed to verify sent message bubble in WhatsApp. Message was not confirmed as sent.")
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            return false
+
+            handler.postDelayed(flowRunnable, 400)
+        }
+
+        fun clickTextOnScreen(text: String): Boolean {
+            return clickElementByQuery(text)
+        }
+
+        fun clickElementByQuery(query: String): Boolean {
+            val inst = instance ?: return false
+            val root = inst.rootInActiveWindow ?: return false
+            val clean = query.trim().lowercase()
+
+            // 1. Direct text search
+            val textNodes = root.findAccessibilityNodeInfosByText(query)
+            for (node in textNodes) {
+                if (inst.performClick(node)) return true
+            }
+
+            // 2. Full hierarchy recursive search for text, contentDescription, or view ID
+            fun recursiveFindAndClick(node: AccessibilityNodeInfo): Boolean {
+                val nodeText = node.text?.toString()?.lowercase() ?: ""
+                val nodeDesc = node.contentDescription?.toString()?.lowercase() ?: ""
+                val nodeId = node.viewIdResourceName?.lowercase() ?: ""
+
+                if (nodeText.contains(clean) || nodeDesc.contains(clean) || (clean.length > 3 && nodeId.contains(clean))) {
+                    if (inst.performClick(node)) return true
+                }
+
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i)
+                    if (child != null) {
+                        if (recursiveFindAndClick(child)) return true
+                    }
+                }
+                return false
+            }
+
+            return recursiveFindAndClick(root)
+        }
+
+        fun tapScreenCoordinate(x: Float, y: Float): Boolean {
+            return dispatchGestureClick(x, y)
+        }
+
+        fun inspectScreenHierarchy(): String {
+            val inst = instance ?: return "Accessibility Service is not active. Please enable Maya in Accessibility settings to capture and see the screen."
+            val root = inst.rootInActiveWindow ?: return "Could not access current active window screen."
+
+            val appPkg = root.packageName?.toString() ?: "Unknown App"
+            val elements = mutableListOf<String>()
+
+            fun traverse(node: AccessibilityNodeInfo, depth: Int) {
+                if (depth > 20) return
+                val text = node.text?.toString()?.trim() ?: ""
+                val desc = node.contentDescription?.toString()?.trim() ?: ""
+                val className = node.className?.toString()?.substringAfterLast(".") ?: "View"
+                val bounds = Rect()
+                node.getBoundsInScreen(bounds)
+
+                val label = if (text.isNotBlank()) text else desc
+                val isClickable = node.isClickable || className.contains("Button") || className.contains("Image") || className.contains("Tab")
+                val isEditable = node.isEditable || className.contains("EditText")
+
+                if (label.isNotBlank()) {
+                    val type = when {
+                        isEditable -> "InputField"
+                        isClickable -> "Button/Clickable"
+                        else -> "Text"
+                    }
+                    elements.add("• [$type] \"$label\" at center(${bounds.centerX()}, ${bounds.centerY()}) bounds=[${bounds.left},${bounds.top} to ${bounds.right},${bounds.bottom}]")
+                } else if (isClickable && !bounds.isEmpty && bounds.width() > 30 && bounds.height() > 30) {
+                    val viewId = node.viewIdResourceName?.substringAfterLast("/") ?: ""
+                    elements.add("• [ClickableIcon] id='$viewId' at center(${bounds.centerX()}, ${bounds.centerY()}) bounds=[${bounds.left},${bounds.top} to ${bounds.right},${bounds.bottom}]")
+                }
+
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i)
+                    if (child != null) {
+                        traverse(child, depth + 1)
+                    }
+                }
+            }
+
+            traverse(root, 0)
+
+            return buildString {
+                append("📱 CURRENT SCREEN CAPTURE & VISION REPORT:\n")
+                append("• Active App: $appPkg\n")
+                append("• Total Visible Elements: ${elements.size}\n")
+                append("• Screen Elements List:\n")
+                if (elements.isEmpty()) {
+                    append("  (No direct text or clickable labels found on current screen)\n")
+                } else {
+                    elements.take(35).forEach { append("  $it\n") }
+                }
+            }
         }
 
         /**
@@ -669,6 +1150,224 @@ class ZoyaAccessibilityService : AccessibilityService() {
         }
 
         return clicked
+    }
+
+    fun findChatHeaderTitle(node: AccessibilityNodeInfo): String {
+        val titleIds = listOf(
+            "com.whatsapp:id/conversation_contact_name",
+            "com.whatsapp:id/chat_title",
+            "com.whatsapp:id/action_bar_title",
+            "com.whatsapp.w4b:id/conversation_contact_name",
+            "com.whatsapp.w4b:id/chat_title"
+        )
+        for (id in titleIds) {
+            val list = node.findAccessibilityNodeInfosByViewId(id)
+            if (list.isNotEmpty()) {
+                val t = list[0].text?.toString()
+                if (!t.isNullOrBlank()) return t
+            }
+        }
+        return ""
+    }
+
+    fun findChatRowByName(node: AccessibilityNodeInfo, contactName: String): AccessibilityNodeInfo? {
+        val rowIds = listOf(
+            "com.whatsapp:id/conversations_row_contact_name",
+            "com.whatsapp:id/chat_title",
+            "com.whatsapp:id/conversations_row_holder",
+            "com.whatsapp.w4b:id/conversations_row_contact_name"
+        )
+        for (id in rowIds) {
+            val list = node.findAccessibilityNodeInfosByViewId(id)
+            for (item in list) {
+                val text = item.text?.toString() ?: ""
+                if (text.isNotBlank() && text.contains(contactName, ignoreCase = true)) {
+                    return item
+                }
+            }
+        }
+        val textMatches = node.findAccessibilityNodeInfosByText(contactName)
+        for (item in textMatches) {
+            if (!item.isEditable && item.className?.toString()?.contains("EditText") != true) {
+                return item
+            }
+        }
+        return null
+    }
+
+    fun findNewChatFab(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val fabIds = listOf(
+            "com.whatsapp:id/fab",
+            "com.whatsapp:id/e_fab",
+            "com.whatsapp:id/floating_action_button",
+            "com.whatsapp.w4b:id/fab"
+        )
+        for (id in fabIds) {
+            val list = node.findAccessibilityNodeInfosByViewId(id)
+            if (list.isNotEmpty()) return list[0]
+        }
+        return recursiveFindFab(node)
+    }
+
+    private fun recursiveFindFab(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        if (desc.contains("new chat") || desc.contains("nayi chat") || desc.contains("नया चैट") || desc.contains("new conversation") || desc.contains("start chat")) {
+            return node
+        }
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        val metrics = resources.displayMetrics
+        if (!bounds.isEmpty &&
+            bounds.right >= metrics.widthPixels * 0.75f &&
+            bounds.bottom >= metrics.heightPixels * 0.75f &&
+            bounds.width() in 70..260 &&
+            bounds.height() in 70..260 &&
+            (node.isClickable || node.className?.toString()?.contains("ImageView") == true || node.className?.toString()?.contains("Button") == true)
+        ) {
+            return node
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                val r = recursiveFindFab(child)
+                if (r != null) return r
+            }
+        }
+        return null
+    }
+
+    fun findSearchButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val searchIds = listOf(
+            "com.whatsapp:id/menuitem_search",
+            "com.whatsapp:id/search_btn",
+            "com.whatsapp:id/search_button",
+            "com.whatsapp:id/action_search",
+            "com.whatsapp.w4b:id/menuitem_search"
+        )
+        for (id in searchIds) {
+            val list = node.findAccessibilityNodeInfosByViewId(id)
+            if (list.isNotEmpty()) return list[0]
+        }
+        return recursiveFindSearchBtn(node)
+    }
+
+    private fun recursiveFindSearchBtn(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        if (desc.contains("search") || desc.contains("खोजें")) {
+            return node
+        }
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        val metrics = resources.displayMetrics
+        if (!bounds.isEmpty &&
+            bounds.top <= metrics.heightPixels * 0.15f &&
+            bounds.right >= metrics.widthPixels * 0.65f &&
+            (node.isClickable || node.className?.toString()?.contains("ImageView") == true)
+        ) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                val r = recursiveFindSearchBtn(child)
+                if (r != null) return r
+            }
+        }
+        return null
+    }
+
+    fun findSearchField(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val searchFieldIds = listOf(
+            "com.whatsapp:id/search_src_text",
+            "com.whatsapp:id/search_input",
+            "com.whatsapp:id/search_edit_text",
+            "com.whatsapp.w4b:id/search_src_text"
+        )
+        for (id in searchFieldIds) {
+            val list = node.findAccessibilityNodeInfosByViewId(id)
+            if (list.isNotEmpty()) return list[0]
+        }
+        return recursiveFindSearchField(node)
+    }
+
+    private fun recursiveFindSearchField(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        val metrics = resources.displayMetrics
+        if (node.isEditable && bounds.top <= metrics.heightPixels * 0.20f) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                val r = recursiveFindSearchField(child)
+                if (r != null) return r
+            }
+        }
+        return null
+    }
+
+    fun findMatchingContactsInPicker(node: AccessibilityNodeInfo, contactName: String): List<AccessibilityNodeInfo> {
+        val results = mutableListOf<AccessibilityNodeInfo>()
+        val pickerIds = listOf(
+            "com.whatsapp:id/contactpicker_row_name",
+            "com.whatsapp:id/contact_row",
+            "com.whatsapp:id/contact_name",
+            "com.whatsapp:id/conversations_row_holder",
+            "com.whatsapp.w4b:id/contactpicker_row_name"
+        )
+        for (id in pickerIds) {
+            val list = node.findAccessibilityNodeInfosByViewId(id)
+            for (item in list) {
+                val txt = item.text?.toString() ?: ""
+                if (txt.isNotBlank() && txt.contains(contactName, ignoreCase = true)) {
+                    results.add(item)
+                }
+            }
+        }
+        if (results.isEmpty()) {
+            val textMatches = node.findAccessibilityNodeInfosByText(contactName)
+            for (item in textMatches) {
+                if (!item.isEditable && item.className?.toString()?.contains("EditText") != true) {
+                    results.add(item)
+                }
+            }
+        }
+        return results
+    }
+
+    fun verifyOutgoingMessageBubble(root: AccessibilityNodeInfo, targetMessage: String): Boolean {
+        val messageIds = listOf(
+            "com.whatsapp:id/message_text",
+            "com.whatsapp:id/conversation_row_text",
+            "com.whatsapp:id/text_content",
+            "com.whatsapp:id/caption",
+            "com.whatsapp.w4b:id/message_text",
+            "com.whatsapp.w4b:id/conversation_row_text"
+        )
+        for (id in messageIds) {
+            val list = root.findAccessibilityNodeInfosByViewId(id)
+            for (n in list) {
+                val txt = n.text?.toString() ?: ""
+                if (txt.isNotBlank()) {
+                    if (txt == targetMessage || txt.contains(targetMessage) || targetMessage.contains(txt)) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        val clean = targetMessage.trim().take(35)
+        if (clean.isNotEmpty()) {
+            val nodes = root.findAccessibilityNodeInfosByText(clean)
+            for (n in nodes) {
+                if (!n.isEditable && n.className?.toString()?.contains("EditText") != true) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     override fun onInterrupt() {

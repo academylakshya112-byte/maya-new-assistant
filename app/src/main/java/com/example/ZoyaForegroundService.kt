@@ -326,14 +326,12 @@ class ZoyaForegroundService : Service() {
             speechChunkCount = 0
             if (isUserSpeaking) {
                 silenceChunkCount++
-                // Stream trailing 200ms (5 chunks) so trailing consonants/words aren't cut off
-                if (silenceChunkCount <= 5) {
+                // Stream trailing 320ms (8 chunks) so trailing speech + natural silence are smoothly sent
+                if (silenceChunkCount <= 8) {
                     liveSessionManager.sendAudioData(buffer, length)
-                } else if (silenceChunkCount == 6) {
-                    // Turn Complete! User just finished speaking!
-                    // Immediately signal end of turn to Gemini Live for instant ultra-fast reply!
+                } else {
                     isUserSpeaking = false
-                    liveSessionManager.signalTurnComplete()
+                    silenceChunkCount = 0
                 }
             } else {
                 // Idle silence: send keepalive chunk every 160ms (every 4th chunk)

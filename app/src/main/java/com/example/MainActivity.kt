@@ -42,6 +42,8 @@ class MainActivity : ComponentActivity() {
         
         checkPermissions()
         startDiagnosticLogging()
+        com.example.media.MediaControlManager.init(this)
+        com.example.brain.BrainEngine.init(this)
 
         setContent {
             MyApplicationTheme(darkTheme = false) {
