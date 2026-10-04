@@ -59,6 +59,8 @@ object BrainEngine {
                     _isPaused.value = settings.isMemoryPaused
                 }
                 seedInitialKnowledge(d)
+                com.example.brain.subsystems.ContextMapEngine.seedInitialGraph(d, CURRENT_USER_ID)
+                com.example.brain.subsystems.SkillForgeEngine.seedInitialSkills(d, CURRENT_USER_ID)
             }
         }
     }
@@ -212,10 +214,27 @@ object BrainEngine {
                 }
                 sb.append(" [Strength: ${mem.strength}]\n")
             }
-        } else {
-            sb.append("No specific prior memories found for this query.\n")
         }
-        sb.append("=== END BRAIN MEMORIES ===\n")
+
+        // --- CONTEXT & KNOWLEDGE MAP RECALL ---
+        val contextGraph = com.example.brain.subsystems.ContextMapEngine.recallContextGraph(d, userPrompt, CURRENT_USER_ID)
+        if (contextGraph.isNotBlank()) {
+            sb.append("\n$contextGraph\n")
+        }
+
+        // --- SKILL FORGE VERIFIED WORKFLOWS RECALL ---
+        val matchingSkills = com.example.brain.subsystems.SkillForgeEngine.findMatchingSkills(d, userPrompt, CURRENT_USER_ID, limit = 2)
+        if (matchingSkills.isNotEmpty()) {
+            sb.append("\n=== SKILL FORGE: VERIFIED WORKFLOWS ===\n")
+            matchingSkills.forEach { skill ->
+                sb.append("• SKILL: ${skill.name} (v${skill.version}, Status: ${skill.status}, Success Rate: ${(skill.successRate * 100).toInt()}%)\n")
+                sb.append("  Description: ${skill.description}\n")
+                sb.append("  Required Tools: ${skill.requiredToolsJson}\n")
+                sb.append("  Verification Rules: ${skill.verificationRulesJson}\n")
+            }
+        }
+
+        sb.append("=== END BRAIN MEMORIES & SKILLS ===\n")
 
         sb.toString()
     }
@@ -395,5 +414,80 @@ object BrainEngine {
     suspend fun getBrainHealth(): BrainHealthStatus = withContext(Dispatchers.IO) {
         val d = dao ?: return@withContext BrainHealthStatus(0, 0, false, emptyMap(), "Error", "Offline", 0L)
         BrainHealthEngine.getHealthStatus(d, CURRENT_USER_ID)
+    }
+
+    // ==========================================
+    // 10. CONTEXT MAP & SKILL FORGE FLOWS & OPS
+    // ==========================================
+
+    fun getAllContextNodesFlow(): Flow<List<com.example.brain.model.ContextNode>>? {
+        return dao?.getAllContextNodesFlow(CURRENT_USER_ID)
+    }
+
+    fun getAllContextEdgesFlow(): Flow<List<com.example.brain.model.ContextEdge>>? {
+        return dao?.getAllContextEdgesFlow(CURRENT_USER_ID)
+    }
+
+    fun getAllSkillsFlow(): Flow<List<com.example.brain.model.SkillEntity>>? {
+        return dao?.getAllSkillsFlow(CURRENT_USER_ID)
+    }
+
+    fun getRecentSkillExecutionsFlow(): Flow<List<com.example.brain.model.SkillExecutionRecord>>? {
+        return dao?.getRecentSkillExecutionsFlow(CURRENT_USER_ID)
+    }
+
+    suspend fun addContextNode(
+        type: com.example.brain.model.ContextNodeType,
+        title: String,
+        description: String = "",
+        importance: Int = 5
+    ): com.example.brain.model.ContextNode? = withContext(Dispatchers.IO) {
+        val d = dao ?: return@withContext null
+        com.example.brain.subsystems.ContextMapEngine.getOrCreateNode(
+            dao = d,
+            userId = CURRENT_USER_ID,
+            type = type,
+            title = title,
+            description = description,
+            importance = importance
+        )
+    }
+
+    suspend fun linkContextNodes(
+        fromId: String,
+        toId: String,
+        relType: com.example.brain.model.ContextRelationshipType
+    ) = withContext(Dispatchers.IO) {
+        val d = dao ?: return@withContext
+        com.example.brain.subsystems.ContextMapEngine.linkNodes(
+            dao = d,
+            userId = CURRENT_USER_ID,
+            fromNodeId = fromId,
+            toNodeId = toId,
+            relationshipType = relType
+        )
+    }
+
+    suspend fun deleteContextNode(id: String) = withContext(Dispatchers.IO) {
+        val d = dao ?: return@withContext
+        d.deleteContextNode(id, CURRENT_USER_ID)
+        d.deleteEdgesForNode(CURRENT_USER_ID, id)
+    }
+
+    suspend fun deleteSkill(skillId: String) = withContext(Dispatchers.IO) {
+        val d = dao ?: return@withContext
+        d.deleteSkill(skillId, CURRENT_USER_ID)
+    }
+
+    suspend fun toggleSkillStatus(skillId: String): Boolean = withContext(Dispatchers.IO) {
+        val d = dao ?: return@withContext false
+        val skill = d.getSkillById(skillId, CURRENT_USER_ID) ?: return@withContext false
+        val newStatus = if (skill.status == com.example.brain.model.SkillStatus.DISABLED.name) {
+            com.example.brain.model.SkillStatus.VERIFIED.name
+        } else {
+            com.example.brain.model.SkillStatus.DISABLED.name
+        }
+        d.updateSkill(skill.copy(status = newStatus, updatedAt = System.currentTimeMillis()))
+        newStatus == com.example.brain.model.SkillStatus.VERIFIED.name
     }
 }

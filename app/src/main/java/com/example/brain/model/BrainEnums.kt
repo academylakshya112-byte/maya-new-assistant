@@ -93,3 +93,71 @@ enum class AuditAction {
     PAUSED,
     RESUMED
 }
+
+// ==========================================
+// CONTEXT / KNOWLEDGE MAP ENUMS
+// ==========================================
+
+enum class ContextNodeType(val icon: String) {
+    USER("👤"),
+    MEMORY("🧠"),
+    PREFERENCE("⚙️"),
+    PROJECT("📁"),
+    FEATURE("🧩"),
+    TASK("📋"),
+    GOAL("🎯"),
+    EVENT("📅"),
+    PROBLEM("⚠️"),
+    CAUSE("🔍"),
+    SOLUTION("💡"),
+    DECISION("⚖️"),
+    SKILL("🛠️"),
+    WORKFLOW("🔄"),
+    TOOL("🔧"),
+    RESULT("✅"),
+    LESSON("📚")
+}
+
+enum class ContextRelationshipType(val label: String) {
+    RELATED_TO("Related To"),
+    BELONGS_TO("Belongs To"),
+    CONTAINS("Contains"),
+    PART_OF("Part Of"),
+    DEPENDS_ON("Depends On"),
+    CAUSED_BY("Caused By"),
+    SOLVED_BY("Solved By"),
+    LEARNED_FROM("Learned From"),
+    USES("Uses"),
+    REQUIRES("Requires"),
+    IMPROVES("Improves"),
+    REPLACES("Replaces"),
+    CONFLICTS_WITH("Conflicts With"),
+    PRECEDES("Precedes"),
+    FOLLOWS("Follows"),
+    PRODUCES("Produces"),
+    ASSOCIATED_WITH("Associated With")
+}
+
+enum class ContextConfidence {
+    HIGH,
+    MEDIUM,
+    LOW
+}
+
+// ==========================================
+// SKILL FORGE ENUMS
+// ==========================================
+
+enum class SkillStatus(val displayName: String) {
+    DRAFT("Draft"),
+    LEARNED("Learned"),
+    VERIFIED("Verified"),
+    OUTDATED("Outdated"),
+    DISABLED("Disabled")
+}
+
+enum class SkillConfidence {
+    LOW,
+    MEDIUM,
+    HIGH
+}

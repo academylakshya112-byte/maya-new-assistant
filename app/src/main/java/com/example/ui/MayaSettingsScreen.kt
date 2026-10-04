@@ -102,7 +102,35 @@ fun MayaSettingsScreen(
         mutableStateOf(prefs.getString("voice_name", "Kore") ?: "Kore")
     }
     var selectedLanguage by remember {
-        mutableStateOf(prefs.getString("app_language", "Hinglish (Hindi + English) — default") ?: "Hinglish (Hindi + English) — default")
+        val raw = prefs.getString("app_language", "Hinglish") ?: "Hinglish"
+        val clean = when {
+            raw.contains("Hinglish", ignoreCase = true) -> "Hinglish"
+            raw.contains("Bhojpuri", ignoreCase = true) -> "Bhojpuri"
+            raw.contains("Hindi", ignoreCase = true) -> "Hindi"
+            raw.contains("English", ignoreCase = true) -> "English"
+            raw.contains("Bengali", ignoreCase = true) -> "Bengali"
+            raw.contains("Marathi", ignoreCase = true) -> "Marathi"
+            raw.contains("Telugu", ignoreCase = true) -> "Telugu"
+            raw.contains("Tamil", ignoreCase = true) -> "Tamil"
+            raw.contains("Gujarati", ignoreCase = true) -> "Gujarati"
+            raw.contains("Kannada", ignoreCase = true) -> "Kannada"
+            raw.contains("Malayalam", ignoreCase = true) -> "Malayalam"
+            raw.contains("Punjabi", ignoreCase = true) -> "Punjabi"
+            raw.contains("Odia", ignoreCase = true) -> "Odia"
+            raw.contains("Urdu", ignoreCase = true) -> "Urdu"
+            raw.contains("Spanish", ignoreCase = true) -> "Spanish"
+            raw.contains("French", ignoreCase = true) -> "French"
+            raw.contains("German", ignoreCase = true) -> "German"
+            raw.contains("Japanese", ignoreCase = true) -> "Japanese"
+            raw.contains("Korean", ignoreCase = true) -> "Korean"
+            raw.contains("Russian", ignoreCase = true) -> "Russian"
+            raw.contains("Arabic", ignoreCase = true) -> "Arabic"
+            raw.contains("Portuguese", ignoreCase = true) -> "Portuguese"
+            raw.contains("Italian", ignoreCase = true) -> "Italian"
+            raw.contains("Chinese", ignoreCase = true) -> "Chinese"
+            else -> raw
+        }
+        mutableStateOf(clean)
     }
     var selectedCountryCode by remember {
         mutableStateOf(prefs.getString("country_code", "🇮🇳 India (+91)") ?: "🇮🇳 India (+91)")
@@ -701,17 +729,39 @@ fun MayaSettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     val languages = listOf(
-                        "Hinglish (Hindi + English) — default",
-                        "Hindi (हिंदी)",
-                        "Bhojpuri (भोजपुरी) 🌸",
-                        "English (US/UK)"
+                        "Hinglish",
+                        "Hindi",
+                        "English",
+                        "Bhojpuri",
+                        "Bengali",
+                        "Marathi",
+                        "Telugu",
+                        "Tamil",
+                        "Gujarati",
+                        "Kannada",
+                        "Malayalam",
+                        "Punjabi",
+                        "Odia",
+                        "Urdu",
+                        "Spanish",
+                        "French",
+                        "German",
+                        "Japanese",
+                        "Korean",
+                        "Russian",
+                        "Arabic",
+                        "Portuguese",
+                        "Italian",
+                        "Chinese"
                     )
                     SettingsDropdownField(
                         selectedValue = selectedLanguage,
                         options = languages,
-                        onSelect = {
-                            selectedLanguage = it
-                            prefs.edit().putString("app_language", it).apply()
+                        onSelect = { lang ->
+                            selectedLanguage = lang
+                            prefs.edit().putString("app_language", lang).apply()
+                            com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
+                            Toast.makeText(context, "Language set to $lang 🗣️", Toast.LENGTH_SHORT).show()
                         }
                     )
                 }

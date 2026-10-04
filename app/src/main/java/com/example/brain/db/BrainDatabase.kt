@@ -14,9 +14,13 @@ import com.example.brain.model.MemoryRelation
         MemoryItem::class,
         MemoryRelation::class,
         BrainAuditLog::class,
-        BrainUserSettings::class
+        BrainUserSettings::class,
+        com.example.brain.model.ContextNode::class,
+        com.example.brain.model.ContextEdge::class,
+        com.example.brain.model.SkillEntity::class,
+        com.example.brain.model.SkillExecutionRecord::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BrainDatabase : RoomDatabase() {

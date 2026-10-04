@@ -159,23 +159,22 @@ class ZoyaForegroundService : Service() {
         scope.launch(Dispatchers.IO) {
             while (isActive && isAudioPlaybackActive) {
                 try {
-                    val data = audioOutputQueue.poll(150, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    val data = audioOutputQueue.poll(20, java.util.concurrent.TimeUnit.MILLISECONDS)
                     if (data != null) {
+                        if (!isMayaActuallySpeaking) {
+                            com.example.live.VoiceLatencyTracker.onPlaybackStarted()
+                        }
                         isMayaActuallySpeaking = true
                         if (audioTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
                             audioTrack?.play()
                         }
                         audioTrack?.write(data, 0, data.size)
                     } else {
-                        // Queue is temporarily empty. Check if server completed turn
+                        // Queue is empty. Check if server completed turn
                         if (isMayaActuallySpeaking && isServerTurnCompleted && audioOutputQueue.isEmpty()) {
-                            // Wait 350ms so AudioTrack hardware buffer drains and room reverberation decays
-                            kotlinx.coroutines.delay(350)
-                            if (audioOutputQueue.isEmpty()) {
-                                isMayaActuallySpeaking = false
-                                isServerTurnCompleted = false
-                                liveSessionManager.onPlaybackFinished()
-                            }
+                            isMayaActuallySpeaking = false
+                            isServerTurnCompleted = false
+                            liveSessionManager.onPlaybackFinished()
                         }
                     }
                 } catch (e: InterruptedException) {
@@ -190,7 +189,7 @@ class ZoyaForegroundService : Service() {
     private fun initAudioTrack() {
         try {
             val minBuf = AudioTrack.getMinBufferSize(outputSampleRate, outChannelConfig, audioFormat)
-            val finalBuf = if (minBuf > 0) minBuf * 2 else 4096
+            val finalBuf = if (minBuf > 0) minBuf else 2048
             
             val builder = AudioTrack.Builder()
                 .setAudioAttributes(
@@ -362,19 +361,23 @@ class ZoyaForegroundService : Service() {
         // When Maya is listening or thinking
         val isVoice = avg > 450
         if (isVoice) {
-            speechChunkCount++
+            isUserSpeaking = true
+            speechChunkCount = 1
             silenceChunkCount = 0
-            if (speechChunkCount >= 2) {
-                isUserSpeaking = true
-            }
             liveSessionManager.sendAudioData(buffer, length)
         } else {
             speechChunkCount = 0
             if (isUserSpeaking) {
+                if (silenceChunkCount == 0) {
+                    com.example.live.VoiceLatencyTracker.onSpeechEnded()
+                }
                 silenceChunkCount++
-                // Stream trailing 320ms (8 chunks) so trailing speech + natural silence are smoothly sent
-                if (silenceChunkCount <= 8) {
+                // Stream maximum 80ms (at most 2 chunks: 2 * 40ms = 80ms safety window) so trailing phoneme is not clipped
+                if (silenceChunkCount <= 2) {
                     liveSessionManager.sendAudioData(buffer, length)
+                    if (silenceChunkCount == 2) {
+                        com.example.live.VoiceLatencyTracker.onSafetyDispatched()
+                    }
                 } else {
                     isUserSpeaking = false
                     silenceChunkCount = 0

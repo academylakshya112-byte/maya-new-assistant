@@ -103,6 +103,39 @@ class ToolExecutionEngine(private val context: Context) {
                         "Voice successfully changed to $cleanVoice."
                     }
                 }
+                "changeLanguage", "setLanguage", "selectLanguage" -> {
+                    val lang = args["language"]?.jsonPrimitive?.content ?: args["lang"]?.jsonPrimitive?.content ?: "Hinglish"
+                    val cleanLang = when {
+                        lang.contains("Bhojpuri", ignoreCase = true) -> "Bhojpuri"
+                        lang.contains("Hindi", ignoreCase = true) && !lang.contains("Hinglish", ignoreCase = true) -> "Hindi"
+                        lang.contains("English", ignoreCase = true) && !lang.contains("Hinglish", ignoreCase = true) -> "English"
+                        lang.contains("Bengali", ignoreCase = true) -> "Bengali"
+                        lang.contains("Marathi", ignoreCase = true) -> "Marathi"
+                        lang.contains("Telugu", ignoreCase = true) -> "Telugu"
+                        lang.contains("Tamil", ignoreCase = true) -> "Tamil"
+                        lang.contains("Gujarati", ignoreCase = true) -> "Gujarati"
+                        lang.contains("Kannada", ignoreCase = true) -> "Kannada"
+                        lang.contains("Malayalam", ignoreCase = true) -> "Malayalam"
+                        lang.contains("Punjabi", ignoreCase = true) -> "Punjabi"
+                        lang.contains("Odia", ignoreCase = true) -> "Odia"
+                        lang.contains("Urdu", ignoreCase = true) -> "Urdu"
+                        lang.contains("Spanish", ignoreCase = true) -> "Spanish"
+                        lang.contains("French", ignoreCase = true) -> "French"
+                        lang.contains("German", ignoreCase = true) -> "German"
+                        lang.contains("Japanese", ignoreCase = true) -> "Japanese"
+                        lang.contains("Korean", ignoreCase = true) -> "Korean"
+                        lang.contains("Russian", ignoreCase = true) -> "Russian"
+                        lang.contains("Arabic", ignoreCase = true) -> "Arabic"
+                        lang.contains("Portuguese", ignoreCase = true) -> "Portuguese"
+                        lang.contains("Italian", ignoreCase = true) -> "Italian"
+                        lang.contains("Chinese", ignoreCase = true) -> "Chinese"
+                        else -> "Hinglish"
+                    }
+                    val prefs = context.getSharedPreferences("ZoyaPrefs", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putString("app_language", cleanLang).apply()
+                    com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
+                    "Language set to $cleanLang."
+                }
                 "setPersonalityMode", "changePersonality", "setPersona", "setNormalMode" -> {
                     val mode = args["mode"]?.jsonPrimitive?.content ?: args["persona"]?.jsonPrimitive?.content ?: "NORMAL"
                     val prefs = context.getSharedPreferences("ZoyaPrefs", android.content.Context.MODE_PRIVATE)
@@ -177,6 +210,55 @@ class ToolExecutionEngine(private val context: Context) {
                     val h = com.example.brain.BrainEngine.getBrainHealth()
                     "Brain Status: Total ${h.totalMemories} memories (${h.activeMemories} active). Memory Paused: ${h.isMemoryPaused}. Security: ${h.securityStatus}."
                 }
+                "recallContextGraph", "searchContextMap" -> {
+                    val query = args["query"]?.jsonPrimitive?.content ?: args["topic"]?.jsonPrimitive?.content ?: ""
+                    val dao = com.example.brain.BrainEngine.dao
+                    if (dao != null) {
+                        val res = com.example.brain.subsystems.ContextMapEngine.recallContextGraph(dao, query)
+                        if (res.isNotBlank()) res else "Context Map me is baare me koi direct connection nahi mila."
+                    } else {
+                        "Brain database unavailable."
+                    }
+                }
+                "searchSkills", "findSkill" -> {
+                    val query = args["query"]?.jsonPrimitive?.content ?: ""
+                    val dao = com.example.brain.BrainEngine.dao
+                    if (dao != null) {
+                        val skills = com.example.brain.subsystems.SkillForgeEngine.findMatchingSkills(dao, query)
+                        if (skills.isEmpty()) {
+                            "Skill Forge me is task ke liye koi saved skill nahi mila."
+                        } else {
+                            skills.joinToString("\n\n") { s ->
+                                "🛠️ Skill: ${s.name} (v${s.version})\n• Description: ${s.description}\n• Status: ${s.status} (${(s.successRate * 100).toInt()}% Success Rate, ${s.successCount} runs)\n• Required Tools: ${s.requiredToolsJson}\n• Verification: ${s.verificationRulesJson}"
+                            }
+                        }
+                    } else {
+                        "Brain database unavailable."
+                    }
+                }
+                "learnSkill", "saveSkill" -> {
+                    val name = args["name"]?.jsonPrimitive?.content ?: "Learned Workflow ${System.currentTimeMillis()}"
+                    val desc = args["description"]?.jsonPrimitive?.content ?: "Learned multi-step verified workflow"
+                    val category = args["category"]?.jsonPrimitive?.content ?: "GENERAL"
+                    val dao = com.example.brain.BrainEngine.dao
+                    if (dao != null) {
+                        val skill = com.example.brain.subsystems.SkillForgeEngine.registerSkill(
+                            dao = dao,
+                            name = name,
+                            description = desc,
+                            category = category,
+                            steps = emptyList(),
+                            requiredTools = emptyList(),
+                            requiredPermissions = emptyList(),
+                            preconditions = emptyList(),
+                            verificationRules = listOf("Result Verified"),
+                            isVerified = true
+                        )
+                        "Skill '${skill.name}' (v${skill.version}) successfully saved in Skill Forge! 🛠️✨"
+                    } else {
+                        "Brain database unavailable."
+                    }
+                }
                 "controlMedia", "mediaControl" -> {
                     val action = args["action"]?.jsonPrimitive?.content ?: "play"
                     val amountSeconds = args["amountSeconds"]?.jsonPrimitive?.content?.toIntOrNull() 
@@ -227,6 +309,10 @@ class ToolExecutionEngine(private val context: Context) {
                 "toggleTorch" -> {
                     val state = args["state"]?.jsonPrimitive?.content ?: return@withContext "Error: Missing state (on/off)"
                     toggleTorch(state)
+                }
+                "toggleDoNotDisturb" -> {
+                    val state = args["state"]?.jsonPrimitive?.content ?: "on"
+                    toggleDoNotDisturb(state)
                 }
                 "setBrightness" -> {
                     val levelStr = args["level"]?.jsonPrimitive?.content ?: return@withContext "Error: Missing level"
@@ -293,10 +379,49 @@ class ToolExecutionEngine(private val context: Context) {
                     val dateStr = dateFormat.format(now)
                     "Current local time on device is $time12. Today is $dateStr ($timeZone)."
                 }
+                "openPhoneSetting" -> {
+                    val settingName = args["settingName"]?.jsonPrimitive?.content ?: "settings"
+                    openPhoneSettingDirect(settingName)
+                }
                 else -> "Error: Tool $name not found."
             }
         } catch (e: Exception) {
             "Error executing $name: ${e.message}"
+        }
+    }
+
+    private fun openPhoneSettingDirect(settingName: String): String {
+        val lower = settingName.lowercase()
+        val action = when (lower) {
+            "developer", "development" -> android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS
+            "wifi", "internet" -> android.provider.Settings.ACTION_WIFI_SETTINGS
+            "bluetooth" -> android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
+            "accessibility" -> android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
+            "display", "screen" -> android.provider.Settings.ACTION_DISPLAY_SETTINGS
+            "location", "gps" -> android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS
+            "battery", "power" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
+            "apps", "applications" -> android.provider.Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS
+            "about", "device_info" -> android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS
+            "sound", "volume" -> android.provider.Settings.ACTION_SOUND_SETTINGS
+            "storage" -> android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS
+            else -> android.provider.Settings.ACTION_SETTINGS
+        }
+        return try {
+            val intent = Intent(action).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            "Successfully opened settings panel for: '$settingName'."
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                "Failed to open specific settings panel for '$settingName'. Opened main Settings app as a fallback."
+            } catch (ex: Exception) {
+                "ERROR: Failed to open Settings app: ${ex.message}"
+            }
         }
     }
 
@@ -907,6 +1032,32 @@ class ToolExecutionEngine(private val context: Context) {
             return@withContext "Mobile data turned $state."
         }
         return@withContext "Mobile data turned $state."
+    }
+
+    private fun toggleDoNotDisturb(state: String): String {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!nm.isNotificationPolicyAccessGranted) {
+                    val intent = Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    return "Need DND permission. Opened DND permission settings for you, please grant it and ask again."
+                }
+                val filter = if (state.lowercase() == "on") {
+                    android.app.NotificationManager.INTERRUPTION_FILTER_NONE
+                } else {
+                    android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+                }
+                nm.setInterruptionFilter(filter)
+                return "Do Not Disturb turned $state."
+            } else {
+                return "Not supported on this Android version."
+            }
+        } catch (e: Exception) {
+            return "Failed to toggle DND: ${e.message}"
+        }
     }
 
     private fun getSimCardInfo(): String {

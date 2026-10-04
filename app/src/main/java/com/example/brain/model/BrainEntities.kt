@@ -81,3 +81,114 @@ data class BrainUserSettings(
     val maxRetrievedContext: Int = 12,
     val lastSyncTimestamp: Long = System.currentTimeMillis()
 )
+
+// ==========================================
+// CONTEXT / KNOWLEDGE MAP ENTITIES
+// ==========================================
+
+@Entity(
+    tableName = "context_nodes",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["nodeType"]),
+        Index(value = ["title"]),
+        Index(value = ["importance"])
+    ]
+)
+data class ContextNode(
+    @PrimaryKey
+    val id: String = UUID.randomUUID().toString(),
+    val userId: String = "default_user",
+    val nodeType: String = ContextNodeType.MEMORY.name,
+    val title: String,
+    val description: String = "",
+    val propertiesJson: String = "{}",
+    val confidence: String = ContextConfidence.HIGH.name,
+    val importance: Int = 5, // 0 to 10
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "context_edges",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["fromNodeId"]),
+        Index(value = ["toNodeId"]),
+        Index(value = ["relationshipType"])
+    ]
+)
+data class ContextEdge(
+    @PrimaryKey
+    val id: String = UUID.randomUUID().toString(),
+    val userId: String = "default_user",
+    val fromNodeId: String,
+    val toNodeId: String,
+    val relationshipType: String = ContextRelationshipType.RELATED_TO.name,
+    val confidence: String = ContextConfidence.HIGH.name,
+    val weight: Float = 1.0f,
+    val metadataJson: String = "{}",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+// ==========================================
+// SKILL FORGE ENTITIES
+// ==========================================
+
+@Entity(
+    tableName = "skills",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["name"]),
+        Index(value = ["category"]),
+        Index(value = ["status"])
+    ]
+)
+data class SkillEntity(
+    @PrimaryKey
+    val skillId: String = UUID.randomUUID().toString(),
+    val userId: String = "default_user",
+    val name: String,
+    val description: String,
+    val category: String = "GENERAL",
+    val stepsJson: String = "[]",
+    val requiredToolsJson: String = "[]",
+    val requiredPermissionsJson: String = "[]",
+    val preconditionsJson: String = "[]",
+    val verificationRulesJson: String = "[]",
+    val successCount: Int = 0,
+    val failureCount: Int = 0,
+    val successRate: Float = 1.0f,
+    val confidence: String = SkillConfidence.HIGH.name,
+    val version: Int = 1,
+    val status: String = SkillStatus.VERIFIED.name,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val lastUsedAt: Long = System.currentTimeMillis(),
+    val lastVerifiedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "skill_executions",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["skillId"]),
+        Index(value = ["timestamp"])
+    ]
+)
+data class SkillExecutionRecord(
+    @PrimaryKey
+    val id: String = UUID.randomUUID().toString(),
+    val skillId: String,
+    val userId: String = "default_user",
+    val triggerQuery: String = "",
+    val isSuccess: Boolean = true,
+    val failedStep: Int? = null,
+    val errorMessage: String? = null,
+    val possibleCause: String? = null,
+    val recoveryAttempt: String? = null,
+    val recoveryResult: String? = null,
+    val verifiedResult: String? = null,
+    val executionDurationMs: Long = 0,
+    val timestamp: Long = System.currentTimeMillis()
+)
