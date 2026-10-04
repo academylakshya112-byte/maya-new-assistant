@@ -164,8 +164,6 @@ fun MayaHomeScreen(
         mutableStateOf(computeGreeting(initialCal.get(Calendar.HOUR_OF_DAY)))
     }
 
-    var showFullscreenCodeModal by remember { mutableStateOf(false) }
-
     // Auto-update greeting based on weather location time or live clock ticker
     LaunchedEffect(weatherReport) {
         while (true) {
@@ -211,52 +209,62 @@ fun MayaHomeScreen(
         // --- Ethereal Cosmic Flow Background matching reference image ---
         EtherealCosmicBackground(modifier = Modifier.fillMaxSize())
 
-        val isWritingCode by WebsiteBuilderManager.isWritingCode.collectAsState()
-        val isWebsiteCodingActive = isWritingCode
+        val isFullScreenCodeVisible by WebsiteBuilderManager.isFullScreenVisible.collectAsState()
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = horizontalPadding, vertical = if (isCompact) 2.dp else 6.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // 1. TOP BAR: Hamburger (left), Maya / Always Here For You (center), Bell & 'S' (right)
-            TopBarSection(
-                onHamburgerClick = onHamburgerClick,
-                onNotificationsClick = { onCardClick("notifications") },
-                onProfileClick = { onCardClick("profile") },
-                isCompact = isCompact
+        androidx.activity.compose.BackHandler(enabled = isFullScreenCodeVisible) {
+            WebsiteBuilderManager.closeFullScreenCode()
+        }
+
+        if (isFullScreenCodeVisible) {
+            // ONLY on screen: Full screen code writing like a human coder. No popups!
+            com.example.ui.WebsiteFullScreenCodeTerminal(
+                onClose = { WebsiteBuilderManager.closeFullScreenCode() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
             )
-
-            // 2. GREETING & STATUS + TOP RIGHT WIDGETS
-            val currentUserName = remember {
-                val name = prefs.getString("user_name", "SHADOW X RAHUL") ?: "SHADOW X RAHUL"
-                if (name.contains("👑")) name else "$name 👑"
-            }
-
-            GreetingSection(
-                greeting = greeting,
-                userName = currentUserName,
-                zoyaState = zoyaState,
-                serviceStarted = serviceStarted,
-                weatherReport = weatherReport,
-                energyLevel = energyLevel,
-                isCompact = isCompact,
-                onWeatherClick = { showWeatherDialog = true },
-                onEnergyClick = { onCardClick("energy") }
-            )
-
-            if (isWebsiteCodingActive) {
-                // 3. FRONT & CENTER: LIVE CODE TERMINAL WHILE MAYA CODES WEBSITE
-                WebsiteBackgroundCodeMatrix(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(vertical = 4.dp)
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = horizontalPadding, vertical = if (isCompact) 2.dp else 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // 1. TOP BAR: Hamburger (left), Maya / Always Here For You (center), Bell & 'S' (right)
+                TopBarSection(
+                    onHamburgerClick = onHamburgerClick,
+                    onNotificationsClick = { onCardClick("notifications") },
+                    onProfileClick = { onCardClick("profile") },
+                    isCompact = isCompact
                 )
-            } else {
+
+                // 2. GREETING & STATUS + TOP RIGHT WIDGETS
+                val currentUserName = remember {
+                    val name = prefs.getString("user_name", "SHADOW X RAHUL") ?: "SHADOW X RAHUL"
+                    if (name.contains("👑")) name else "$name 👑"
+                }
+
+                GreetingSection(
+                    greeting = greeting,
+                    userName = currentUserName,
+                    zoyaState = zoyaState,
+                    serviceStarted = serviceStarted,
+                    weatherReport = weatherReport,
+                    energyLevel = energyLevel,
+                    isCompact = isCompact,
+                    onWeatherClick = { showWeatherDialog = true },
+                    onEnergyClick = { onCardClick("energy") }
+                )
+
+                // 3. FOCUS BANNER (IF STUDY MODE OR RESTRICTED MODE ACTIVE)
+                StudyFocusActiveBanner(
+                    onClick = { onCardClick("study") },
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+
                 // 3. CENTERPIECE: DYNAMIC MAYA ANIMATION (DEFAULT: MAYA 2047 3D COSMIC PLANET)
                 Box(
                     modifier = Modifier
@@ -284,47 +292,40 @@ fun MayaHomeScreen(
                         }
                     }
                 )
+
+                // 4.5 COMPACT MEDIA CONTROL CARD (Shows when media is actively playing)
+                CompactMediaCard(
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+
+                // 5. INPUT BAR: "Ask Maya anything..."
+                BottomInputBar(
+                    text = textInput,
+                    isCompact = isCompact,
+                    onTextChange = { textInput = it },
+                    onSend = {
+                        if (textInput.isNotBlank()) {
+                            incrementEnergy()
+                            onSendText(textInput)
+                            textInput = ""
+                        }
+                    },
+                    onAttach = { onCardClick("attach") }
+                )
+
+                // 6. BOTTOM NAVIGATION BAR (FLOATING PURE WHITE PILL)
+                BottomNavBar(
+                    isActive = serviceStarted,
+                    onMicClick = onMicClick,
+                    onHomeClick = { /* Already at home */ },
+                    onScanClick = { onCardClick("scan") },
+                    onMemoriesClick = { onCardClick("memories") },
+                    onChatClick = onNavigateToChat,
+                    isCompact = isCompact,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-
-            // 4.5 COMPACT MEDIA CONTROL CARD (Shows when media is actively playing)
-            CompactMediaCard(
-                modifier = Modifier.padding(bottom = 2.dp)
-            )
-
-            // 5. INPUT BAR: "Ask Maya anything..."
-            BottomInputBar(
-                text = textInput,
-                isCompact = isCompact,
-                onTextChange = { textInput = it },
-                onSend = {
-                    if (textInput.isNotBlank()) {
-                        incrementEnergy()
-                        onSendText(textInput)
-                        textInput = ""
-                    }
-                },
-                onAttach = { onCardClick("attach") }
-            )
-
-            // 6. BOTTOM NAVIGATION BAR (FLOATING PURE WHITE PILL)
-            BottomNavBar(
-                isActive = serviceStarted,
-                onMicClick = onMicClick,
-                onHomeClick = { /* Already at home */ },
-                onScanClick = { onCardClick("scan") },
-                onMemoriesClick = { onCardClick("memories") },
-                onChatClick = onNavigateToChat,
-                isCompact = isCompact,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
-    }
-
-    // Fullscreen Code View Modal when user taps expand
-    if (showFullscreenCodeModal) {
-        WebsiteFullscreenCodeModal(
-            onDismiss = { showFullscreenCodeModal = false }
-        )
     }
 
     // Interactive Weather Report Dialog for any location & current location

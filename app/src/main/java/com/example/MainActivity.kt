@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
         
         checkPermissions()
         startDiagnosticLogging()
+        com.example.study.StudyFocusManager.init(this)
         com.example.media.MediaControlManager.init(this)
         com.example.brain.BrainEngine.init(this)
         com.example.web.WebsiteBuilderManager.currentActivity = this

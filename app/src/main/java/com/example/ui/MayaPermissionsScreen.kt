@@ -207,6 +207,36 @@ fun MayaPermissionsScreen(
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // CARD 1: 📚 Study Mode
+            StudyPermissionCard(
+                emoji = "📚",
+                title = "Study Mode",
+                description = "Study Mode ko distractions control karne ke liye required permission.",
+                isGranted = accessibilityGranted,
+                onAllow = {
+                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    android.widget.Toast.makeText(context, "Please enable Maya in Accessibility for Study Mode", android.widget.Toast.LENGTH_LONG).show()
+                }
+            )
+
+            // CARD 2: 🔒 Study Restricted Mode
+            StudyPermissionCard(
+                emoji = "🔒",
+                title = "Study Restricted Mode",
+                description = "Strict study protection aur distracting apps/content control karne ke liye required permission.",
+                isGranted = accessibilityGranted,
+                onAllow = {
+                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    android.widget.Toast.makeText(context, "Please enable Maya in Accessibility for Study Restricted Mode", android.widget.Toast.LENGTH_LONG).show()
+                }
+            )
+
             // 1. SCREEN CAPTURE (PROMINENT TOP CARD WITH ICON BADGE & ALLOW BUTTON)
             Box(
                 modifier = Modifier
@@ -507,6 +537,103 @@ fun PermissionItemCard(
                         text = "Allow",
                         color = Color.White,
                         fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StudyPermissionCard(
+    emoji: String,
+    title: String,
+    description: String,
+    isGranted: Boolean,
+    onAllow: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF150F25))
+            .border(1.dp, if (isGranted) Color(0xFF059669).copy(alpha = 0.5f) else Color(0xFF281C44), RoundedCornerShape(16.dp))
+            .padding(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1E1435)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = emoji,
+                    fontSize = 22.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.5.sp
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = description,
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            if (isGranted) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFF064E3B).copy(alpha = 0.5f))
+                        .border(1.dp, Color(0xFF059669), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Permission Allowed",
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Permission Allowed",
+                        color = Color(0xFF10B981),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else {
+                Button(
+                    onClick = onAllow,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF2A85)),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "Allow Permission",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

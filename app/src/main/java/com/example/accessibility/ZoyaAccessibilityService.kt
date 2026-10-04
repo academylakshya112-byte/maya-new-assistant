@@ -921,6 +921,7 @@ class ZoyaAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        com.example.study.StudyFocusManager.init(this)
         Log.d("ZoyaAccessibility", "Accessibility Service Connected")
     }
 
@@ -931,6 +932,9 @@ class ZoyaAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+
+        // Maya Study Focus System Guard (Restricted Mode & Normal Mode)
+        com.example.study.StudyFocusManager.onAccessibilityEvent(this, event)
 
         val packageName = event.packageName?.toString() ?: ""
 

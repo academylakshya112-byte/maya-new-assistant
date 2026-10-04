@@ -70,13 +70,13 @@ class ToolExecutionEngine(private val context: Context) {
                     val topic = args["topic"]?.jsonPrimitive?.content ?: "Portfolio Website"
                     val description = args["description"]?.jsonPrimitive?.content ?: args["prompt"]?.jsonPrimitive?.content ?: topic
                     com.example.web.WebsiteBuilderManager.startBuild(context, topic, description, isModification = false)
-                    "Started building website '$topic'. Live glowing code is now streaming on the Home Screen background and will open in Google Chrome."
+                    "Started building website '$topic'. Code is typing live in full screen on Maya's home screen like a human coder with no popups."
                 }
                 "modifyWebsite", "updateWebsite" -> {
                     val instructions = args["instructions"]?.jsonPrimitive?.content ?: args["changes"]?.jsonPrimitive?.content ?: "Update website styling"
                     val currentTopic = com.example.web.WebsiteBuilderManager.currentProjectTitle.value
                     com.example.web.WebsiteBuilderManager.startBuild(context, currentTopic, instructions, isModification = true)
-                    "Started modifying website with: '$instructions'. Updated glowing code is streaming on the Home Screen background."
+                    "Started modifying website with: '$instructions'. Code is updating live in full screen on Maya's home screen."
                 }
                 "openWebsiteInChrome" -> {
                     com.example.web.WebsiteBuilderManager.openInChrome(context)
@@ -382,6 +382,83 @@ class ToolExecutionEngine(private val context: Context) {
                 "openPhoneSetting" -> {
                     val settingName = args["settingName"]?.jsonPrimitive?.content ?: "settings"
                     openPhoneSettingDirect(settingName)
+                }
+                "startStudyMode", "activateStudyMode" -> {
+                    val modeStr = args["mode"]?.jsonPrimitive?.content ?: "NORMAL"
+                    val durationMin = args["durationMinutes"]?.jsonPrimitive?.content?.toIntOrNull()
+                        ?: args["duration"]?.jsonPrimitive?.content?.toIntOrNull()
+                        ?: return@withContext "Kitne time ke liye boss?"
+                    val modeEnum = if (modeStr.contains("restrict", ignoreCase = true)) {
+                        com.example.study.StudyModeType.RESTRICTED
+                    } else {
+                        com.example.study.StudyModeType.NORMAL
+                    }
+
+                    val policyStr = args["youtubePolicy"]?.jsonPrimitive?.content
+                        ?: args["policy"]?.jsonPrimitive?.content
+                        ?: ""
+
+                    val youtubePolicy = when {
+                        policyStr.contains("restrict", ignoreCase = true) -> com.example.study.YouTubePolicy.RESTRICTED
+                        policyStr.contains("study", ignoreCase = true) -> com.example.study.YouTubePolicy.STUDY
+                        else -> com.example.study.YouTubePolicy.NONE
+                    }
+
+                    if (modeEnum == com.example.study.StudyModeType.RESTRICTED && youtubePolicy == com.example.study.YouTubePolicy.NONE) {
+                        return@withContext "Boss, YouTube ko Study Mode me rakhna hai ya YouTube ko bhi Study Restricted Mode me rakhun?"
+                    }
+
+                    val result = com.example.study.StudyFocusManager.activateMode(modeEnum, durationMin, youtubePolicy)
+                    when (result) {
+                        is com.example.study.ActivationResult.Success -> result.message
+                        is com.example.study.ActivationResult.NeedsYouTubePolicy -> result.message
+                        is com.example.study.ActivationResult.MissingPermission -> result.message
+                        is com.example.study.ActivationResult.AlreadyActive -> result.message
+                        is com.example.study.ActivationResult.Error -> result.message
+                    }
+                }
+                "stopStudyMode" -> {
+                    val isEmergency = args["isEmergency"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+                    if (isEmergency) {
+                        val req = com.example.study.StudyFocusManager.requestEmergencyOverride()
+                        when (req) {
+                            is com.example.study.DeactivationResult.NeedsEmergencyConfirmation -> req.message
+                            is com.example.study.DeactivationResult.NotActive -> req.message
+                            else -> "Boss, Emergency Override se Study Restricted Mode samay se pehle band ho jayega. Confirm karein?"
+                        }
+                    } else {
+                        val result = com.example.study.StudyFocusManager.deactivateNormalMode()
+                        when (result) {
+                            is com.example.study.DeactivationResult.Success -> result.message
+                            is com.example.study.DeactivationResult.RestrictedLocked -> result.message
+                            is com.example.study.DeactivationResult.NotActive -> result.message
+                            else -> "Study Mode band kar diya boss."
+                        }
+                    }
+                }
+                "requestEmergencyOverride" -> {
+                    val req = com.example.study.StudyFocusManager.requestEmergencyOverride()
+                    when (req) {
+                        is com.example.study.DeactivationResult.NeedsEmergencyConfirmation -> req.message
+                        is com.example.study.DeactivationResult.NotActive -> req.message
+                        else -> "Boss, Emergency Override se Study Restricted Mode samay se pehle band ho jayega. Confirm karein?"
+                    }
+                }
+                "confirmEmergencyOverride" -> {
+                    val confirmed = args["confirmed"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+                        ?: args["confirm"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+                        ?: true
+                    val result = com.example.study.StudyFocusManager.confirmEmergencyOverride(confirmed)
+                    when (result) {
+                        is com.example.study.DeactivationResult.Success -> result.message
+                        is com.example.study.DeactivationResult.Cancelled -> result.message
+                        is com.example.study.DeactivationResult.NeedsEmergencyConfirmation -> result.message
+                        is com.example.study.DeactivationResult.NotActive -> result.message
+                        else -> "Emergency override status updated."
+                    }
+                }
+                "getStudyStatus", "getStudyModeStatus", "checkStudyTimer" -> {
+                    com.example.study.StudyFocusManager.getStatusSpoken()
                 }
                 else -> "Error: Tool $name not found."
             }

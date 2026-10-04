@@ -57,7 +57,7 @@ sealed class SideMenuItem(
     object Settings : SideMenuItem("settings", "Settings", Icons.Default.Settings)
     object Documents : SideMenuItem("documents", "Documents", Icons.AutoMirrored.Filled.List)
     object StudyWhiteboard : SideMenuItem("study_whiteboard", "Study / Whiteboard", Icons.Default.Edit)
-    object Permissions : SideMenuItem("permissions", "Permissions", Icons.Default.Lock)
+    object Permissions : SideMenuItem("permissions", "Permission Settings", Icons.Default.Lock)
     object About : SideMenuItem("about", "About", Icons.Default.Info)
     object PrivacyPolicy : SideMenuItem("privacy", "Privacy Policy", Icons.Default.Person)
 }

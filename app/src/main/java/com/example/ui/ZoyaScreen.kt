@@ -110,6 +110,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
     var isBrainOpen by remember { mutableStateOf(false) }
     var showInfoDialogTitle by remember { mutableStateOf<String?>(null) }
     var showInfoDialogBody by remember { mutableStateOf<String?>(null) }
+    var showStudyFocusDialog by remember { mutableStateOf(false) }
     var isSettingsOpen by remember { mutableStateOf(false) }
 
     var selectedPersona by remember {
@@ -215,8 +216,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                                 onNavigateToChat()
                             }
                             SideMenuItem.StudyWhiteboard -> {
-                                showInfoDialogTitle = "Study & Whiteboard"
-                                showInfoDialogBody = "Maya Study Mode: Ask Maya any math problem, code question, or science concept for step-by-step guidance."
+                                showStudyFocusDialog = true
                             }
                             SideMenuItem.Permissions -> {
                                 isPermissionsOpen = true
@@ -299,7 +299,6 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                         Toast.makeText(context, "I love you too babu! 💖", Toast.LENGTH_SHORT).show()
                         startOrToggleVoice()
                     } else if (lower.contains("website") || lower.contains("web site")) {
-                        Toast.makeText(context, "Maya is coding your website! 💻✨", Toast.LENGTH_SHORT).show()
                         val isMod = lower.contains("badal") || lower.contains("change") || lower.contains("update") || lower.contains("modify")
                         com.example.web.WebsiteBuilderManager.startBuild(context, query, query, isModification = isMod)
                     } else if (lower.contains("gana gao") || lower.contains("gaana gao") || lower.contains("kuch gao") || lower.contains("sing")) {
@@ -318,8 +317,7 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                         showInfoDialogBody = "Ask Maya: 'Play some lo-fi beats' or 'Play upbeat music on Spotify/YouTube'!"
                     }
                     "study" -> {
-                        showInfoDialogTitle = "📖 Maya Study Mode"
-                        showInfoDialogBody = "Maya is ready to help you prepare for exams, summarize documents, and explain complex concepts."
+                        showStudyFocusDialog = true
                     }
                     "journal" -> {
                         showInfoDialogTitle = "✏️ Personal Journal"
@@ -582,6 +580,10 @@ fun MayaMainContainer(onNavigateToChat: () -> Unit) {
                 }
             }
         )
+    }
+
+    if (showStudyFocusDialog) {
+        StudyFocusDialog(onDismissRequest = { showStudyFocusDialog = false })
     }
 }
 

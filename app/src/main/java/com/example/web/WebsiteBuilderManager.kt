@@ -36,6 +36,9 @@ object WebsiteBuilderManager {
     private val _isWritingCode = MutableStateFlow(false)
     val isWritingCode = _isWritingCode.asStateFlow()
 
+    private val _isFullScreenVisible = MutableStateFlow(false)
+    val isFullScreenVisible = _isFullScreenVisible.asStateFlow()
+
     private val _isCompleted = MutableStateFlow(false)
     val isCompleted = _isCompleted.asStateFlow()
 
@@ -60,6 +63,15 @@ object WebsiteBuilderManager {
     private val _latestFile = MutableStateFlow<File?>(null)
     val latestFile = _latestFile.asStateFlow()
 
+    fun closeFullScreenCode() {
+        _isFullScreenVisible.value = false
+        _isWritingCode.value = false
+    }
+
+    fun openFullScreenCode() {
+        _isFullScreenVisible.value = true
+    }
+
     fun startBuild(
         context: Context,
         topic: String,
@@ -70,6 +82,7 @@ object WebsiteBuilderManager {
         _currentProjectTitle.value = title
         _currentPrompt.value = userInstructions
         _isWritingCode.value = true
+        _isFullScreenVisible.value = true
         _isCompleted.value = false
         _isDismissed.value = false
         _statusText.value = if (isModification) "Updating website with your changes..." else "Designing & coding website..."
@@ -104,23 +117,16 @@ object WebsiteBuilderManager {
                 // Start local HTTP preview server
                 LocalWebPreviewServer.start { _latestHtmlContent.value }
 
-                // Human-like streaming of code to UI
+                // Human-like streaming of code to UI on full screen
                 streamCodeLikeHuman(fullHtml)
 
-                _statusText.value = "Website code complete! Opened in Chrome 🌐"
-
-                // Open directly in Chrome
-                openInChrome(context)
-
-                // Once opened in Chrome, dismiss code screen automatically so screen clears completely!
-                delay(600)
+                _statusText.value = "Website code complete! 💻✨"
                 _isWritingCode.value = false
                 _isCompleted.value = true
-                _codeLines.value = emptyList()
+                // No popup, no auto Chrome launch - code stays full screen on Maya's home screen
             } catch (e: Exception) {
                 Log.e(TAG, "Error generating website: ${e.message}", e)
                 _isWritingCode.value = false
-                _codeLines.value = emptyList()
                 _statusText.value = "Generation completed with fallback"
             }
         }

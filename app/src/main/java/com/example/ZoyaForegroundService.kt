@@ -87,6 +87,13 @@ class ZoyaForegroundService : Service() {
         try {
             activeService = this
             toolEngine = ToolExecutionEngine(this)
+            com.example.study.StudyFocusManager.init(this)
+            com.example.study.StudyFocusManager.onModeExpired = { expiredMode ->
+                if (activeService != null && currentState != com.example.live.ZoyaState.IDLE) {
+                    val modeName = if (expiredMode == com.example.study.StudyModeType.RESTRICTED) "Study Restricted Mode" else "Study Mode"
+                    liveSessionManager.sendTextMessage("SYSTEM_EVENT: $modeName ka time poora ho gaya hai.")
+                }
+            }
             
             val onAudioOut: (ByteArray) -> Unit = { audioData ->
                 playAudio(audioData)
@@ -470,9 +477,22 @@ class ZoyaForegroundService : Service() {
             }
         )
 
+        val studyState = com.example.study.StudyFocusManager.state.value
+        val title = if (studyState.isActive) {
+            if (studyState.mode == com.example.study.StudyModeType.RESTRICTED) "🛡️ Study Restricted Mode Locked"
+            else "📚 Study Mode Active"
+        } else {
+            "Maya is active 💖"
+        }
+        val contentText = if (studyState.isActive) {
+            "Timer is running. Focus on your study goals!"
+        } else {
+            "Listening in background. Tap Turn Off to stop."
+        }
+
         return NotificationCompat.Builder(this, "ZOYA_CHANNEL")
-            .setContentTitle("Maya is active 💖")
-            .setContentText("Listening in background. Tap Turn Off to stop.")
+            .setContentTitle(title)
+            .setContentText(contentText)
             .setSmallIcon(R.mipmap.ic_launcher_round)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Turn Off", stopPendingIntent)
