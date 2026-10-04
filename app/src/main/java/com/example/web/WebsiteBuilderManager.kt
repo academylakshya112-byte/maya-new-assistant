@@ -39,6 +39,9 @@ object WebsiteBuilderManager {
     private val _isCompleted = MutableStateFlow(false)
     val isCompleted = _isCompleted.asStateFlow()
 
+    private val _isDismissed = MutableStateFlow(false)
+    val isDismissed = _isDismissed.asStateFlow()
+
     private val _currentProjectTitle = MutableStateFlow("Maya Web Project")
     val currentProjectTitle = _currentProjectTitle.asStateFlow()
 
@@ -68,12 +71,27 @@ object WebsiteBuilderManager {
         _currentPrompt.value = userInstructions
         _isWritingCode.value = true
         _isCompleted.value = false
+        _isDismissed.value = false
         _statusText.value = if (isModification) "Updating website with your changes..." else "Designing & coding website..."
         _codeLines.value = emptyList()
 
         scope.launch {
             try {
-                val fullHtml = generateWebsiteCode(context, topic, userInstructions, isModification)
+                // Generate code for new website or modification
+                val fullHtml = if (isModification && _latestHtmlContent.value.isNotBlank()) {
+                    var modified = generateWebsiteCode(context, topic, userInstructions, isModification)
+                    if (modified.length < 50 || !modified.contains("<html", ignoreCase = true)) {
+                        modified = applySmartModification(_latestHtmlContent.value, userInstructions)
+                    }
+                    modified
+                } else {
+                    val aiGenerated = generateWebsiteCode(context, topic, userInstructions, isModification)
+                    if (aiGenerated.length > 50 && aiGenerated.contains("<html", ignoreCase = true)) {
+                        aiGenerated
+                    } else {
+                        buildSmartTemplate(topic, userInstructions, isModification)
+                    }
+                }
                 _latestHtmlContent.value = fullHtml
 
                 // Save locally
@@ -89,18 +107,67 @@ object WebsiteBuilderManager {
                 // Human-like streaming of code to UI
                 streamCodeLikeHuman(fullHtml)
 
-                _isWritingCode.value = false
-                _isCompleted.value = true
                 _statusText.value = "Website code complete! Opened in Chrome 🌐"
 
                 // Open directly in Chrome
                 openInChrome(context)
+
+                // Once opened in Chrome, dismiss code screen automatically so screen clears completely!
+                delay(600)
+                _isWritingCode.value = false
+                _isCompleted.value = true
+                _codeLines.value = emptyList()
             } catch (e: Exception) {
                 Log.e(TAG, "Error generating website: ${e.message}", e)
                 _isWritingCode.value = false
+                _codeLines.value = emptyList()
                 _statusText.value = "Generation completed with fallback"
             }
         }
+    }
+
+    private fun applySmartModification(currentHtml: String, instructions: String): String {
+        var html = currentHtml
+        val lower = instructions.lowercase()
+
+        // 1. Color customizations
+        when {
+            lower.contains("red") || lower.contains("laal") -> {
+                html = html.replace(Regex("--primary:\\s*#[0-9a-fA-F]+;"), "--primary: #FF2B43;")
+                    .replace(Regex("--primary-glow:\\s*rgba\\([^)]+\\);"), "--primary-glow: rgba(255, 43, 67, 0.4);")
+            }
+            lower.contains("green") || lower.contains("hara") -> {
+                html = html.replace(Regex("--primary:\\s*#[0-9a-fA-F]+;"), "--primary: #00E676;")
+                    .replace(Regex("--primary-glow:\\s*rgba\\([^)]+\\);"), "--primary-glow: rgba(0, 230, 118, 0.4);")
+            }
+            lower.contains("blue") || lower.contains("neela") -> {
+                html = html.replace(Regex("--primary:\\s*#[0-9a-fA-F]+;"), "--primary: #2979FF;")
+                    .replace(Regex("--primary-glow:\\s*rgba\\([^)]+\\);"), "--primary-glow: rgba(41, 121, 255, 0.4);")
+            }
+            lower.contains("gold") || lower.contains("yellow") || lower.contains("peela") -> {
+                html = html.replace(Regex("--primary:\\s*#[0-9a-fA-F]+;"), "--primary: #FFD700;")
+                    .replace(Regex("--primary-glow:\\s*rgba\\([^)]+\\);"), "--primary-glow: rgba(255, 215, 0, 0.4);")
+            }
+            lower.contains("purple") || lower.contains("baingani") -> {
+                html = html.replace(Regex("--primary:\\s*#[0-9a-fA-F]+;"), "--primary: #9C27B0;")
+                    .replace(Regex("--primary-glow:\\s*rgba\\([^)]+\\);"), "--primary-glow: rgba(156, 39, 176, 0.4);")
+            }
+        }
+
+        // 2. Light / Dark mode
+        if (lower.contains("light mode") || lower.contains("white background") || lower.contains("safed")) {
+            html = html.replace(Regex("--bg-dark:\\s*#[0-9a-fA-F]+;"), "--bg-dark: #F0F4F8;")
+                .replace(Regex("--text-main:\\s*#[0-9a-fA-F]+;"), "--text-main: #0F172A;")
+                .replace(Regex("--text-muted:\\s*#[0-9a-fA-F]+;"), "--text-muted: #475569;")
+                .replace(Regex("--card-bg:\\s*rgba\\([^)]+\\);"), "--card-bg: rgba(255, 255, 255, 0.85);")
+        } else if (lower.contains("dark mode") || lower.contains("black background") || lower.contains("kaala")) {
+            html = html.replace(Regex("--bg-dark:\\s*#[0-9a-fA-F]+;"), "--bg-dark: #0A0817;")
+                .replace(Regex("--text-main:\\s*#[0-9a-fA-F]+;"), "--text-main: #FFFFFF;")
+                .replace(Regex("--text-muted:\\s*#[0-9a-fA-F]+;"), "--text-muted: #A59DC2;")
+                .replace(Regex("--card-bg:\\s*rgba\\([^)]+\\);"), "--card-bg: rgba(26, 20, 48, 0.7);")
+        }
+
+        return html
     }
 
     private suspend fun streamCodeLikeHuman(html: String) {
@@ -641,5 +708,6 @@ object WebsiteBuilderManager {
 
     fun dismissCode() {
         _isWritingCode.value = false
+        _isDismissed.value = true
     }
 }

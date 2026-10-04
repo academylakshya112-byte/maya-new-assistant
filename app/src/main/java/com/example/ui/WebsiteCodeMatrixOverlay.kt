@@ -71,7 +71,7 @@ fun WebsiteBackgroundCodeMatrix(
     val isCompleted by WebsiteBuilderManager.isCompleted.collectAsState()
     val projectTitle by WebsiteBuilderManager.currentProjectTitle.collectAsState()
 
-    if (codeLines.isEmpty()) return
+    if (codeLines.isEmpty() && !isWritingCode) return
 
     val listState = rememberLazyListState()
 

@@ -82,6 +82,67 @@ class ToolExecutionEngine(private val context: Context) {
                     com.example.web.WebsiteBuilderManager.openInChrome(context)
                     "Opening website in Google Chrome."
                 }
+                "changeVoice", "setVoice", "selectVoice" -> {
+                    val voice = args["voiceName"]?.jsonPrimitive?.content ?: args["voice"]?.jsonPrimitive?.content ?: "Kore"
+                    val cleanVoice = when {
+                        voice.contains("aoede", ignoreCase = true) -> "Aoede"
+                        voice.contains("venom", ignoreCase = true) -> "Venom"
+                        voice.contains("charon", ignoreCase = true) -> "Charon"
+                        voice.contains("fenrir", ignoreCase = true) -> "Fenrir"
+                        voice.contains("puck", ignoreCase = true) -> "Puck"
+                        voice.contains("jarvis", ignoreCase = true) -> "Jarvis"
+                        voice.contains("friday", ignoreCase = true) -> "Friday"
+                        else -> "Kore"
+                    }
+                    val prefs = context.getSharedPreferences("ZoyaPrefs", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putString("voice_name", cleanVoice).apply()
+                    com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
+                    if (cleanVoice == "Venom") {
+                        "WE ARE VENOM! Voice set to Venom."
+                    } else {
+                        "Voice successfully changed to $cleanVoice."
+                    }
+                }
+                "setPersonalityMode", "changePersonality", "setPersona", "setNormalMode" -> {
+                    val mode = args["mode"]?.jsonPrimitive?.content ?: args["persona"]?.jsonPrimitive?.content ?: "NORMAL"
+                    val prefs = context.getSharedPreferences("ZoyaPrefs", android.content.Context.MODE_PRIVATE)
+                    val resultText = when {
+                        mode.contains("normal", ignoreCase = true) || mode.contains("off", ignoreCase = true) || mode.contains("simple", ignoreCase = true) || mode.contains("disable", ignoreCase = true) -> {
+                            prefs.edit()
+                                .putBoolean("personality_mode_enabled", false)
+                                .putString("persona_mode", "NORMAL MODE")
+                                .putString("maya_persona", "NORMAL MODE")
+                                .apply()
+                            "Normal Mode active kar diya gaya hai. Ab main simple aur professional tarike se baat karungi."
+                        }
+                        mode.contains("nakhre", ignoreCase = true) || mode.contains("playful", ignoreCase = true) -> {
+                            prefs.edit()
+                                .putBoolean("personality_mode_enabled", true)
+                                .putString("persona_mode", "PLAYFUL & NAKHRE")
+                                .putString("maya_persona", "PLAYFUL & NAKHRE")
+                                .apply()
+                            "Playful & Nakhre mode active ho gaya hai!"
+                        }
+                        mode.contains("friendly", ignoreCase = true) -> {
+                            prefs.edit()
+                                .putBoolean("personality_mode_enabled", true)
+                                .putString("persona_mode", "SUPER FRIENDLY")
+                                .putString("maya_persona", "SUPER FRIENDLY")
+                                .apply()
+                            "Super Friendly mode active ho gaya hai!"
+                        }
+                        else -> {
+                            prefs.edit()
+                                .putBoolean("personality_mode_enabled", true)
+                                .putString("persona_mode", "MAYA 💕 GIRLFRIEND")
+                                .putString("maya_persona", "MAYA 💕 GIRLFRIEND")
+                                .apply()
+                            "Maya Girlfriend mode active ho gaya hai! 💕"
+                        }
+                    }
+                    com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
+                    resultText
+                }
                 "turnOffMaya", "stopAssistant" -> {
                     com.example.ZoyaForegroundService.stopService(context)
                     "Maya service stopped successfully."

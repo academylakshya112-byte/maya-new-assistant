@@ -1,5 +1,6 @@
 package com.example.ui
 
+import com.example.web.WebsiteBuilderManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -56,6 +57,7 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -209,13 +211,8 @@ fun MayaHomeScreen(
         // --- Ethereal Cosmic Flow Background matching reference image ---
         EtherealCosmicBackground(modifier = Modifier.fillMaxSize())
 
-        // --- GLOWING LIVE CODE MATRIX (Background Stream) ---
-        WebsiteBackgroundCodeMatrix(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = horizontalPadding, vertical = if (isCompact) 50.dp else 60.dp)
-        )
+        val isWritingCode by WebsiteBuilderManager.isWritingCode.collectAsState()
+        val isWebsiteCodingActive = isWritingCode
 
         Column(
             modifier = Modifier
@@ -251,33 +248,43 @@ fun MayaHomeScreen(
                 onEnergyClick = { onCardClick("energy") }
             )
 
-            // 3. CENTERPIECE: DYNAMIC MAYA ANIMATION (DEFAULT: MAYA 2047 3D COSMIC PLANET)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                MayaDynamicOrbView(
-                    state = if (!serviceStarted) ZoyaState.IDLE else zoyaState,
-                    orbSize = orbSize
+            if (isWebsiteCodingActive) {
+                // 3. FRONT & CENTER: LIVE CODE TERMINAL WHILE MAYA CODES WEBSITE
+                WebsiteBackgroundCodeMatrix(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(vertical = 4.dp)
+                )
+            } else {
+                // 3. CENTERPIECE: DYNAMIC MAYA ANIMATION (DEFAULT: MAYA 2047 3D COSMIC PLANET)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    MayaDynamicOrbView(
+                        state = if (!serviceStarted) ZoyaState.IDLE else zoyaState,
+                        orbSize = orbSize
+                    )
+                }
+
+                // 4. ACTION CARDS GRID (2 ROWS OF 3 ROUNDED PURE WHITE CARDS)
+                ActionCardsGrid(
+                    dayOfMonth = dayOfMonth,
+                    dayOfWeekMonth = dayOfWeekMonth,
+                    weatherReport = weatherReport,
+                    isCompact = isCompact,
+                    onCardClick = { cardId ->
+                        incrementEnergy()
+                        if (cardId == "weather") {
+                            showWeatherDialog = true
+                        } else {
+                            onCardClick(cardId)
+                        }
+                    }
                 )
             }
-
-            // 4. ACTION CARDS GRID (2 ROWS OF 3 ROUNDED PURE WHITE CARDS)
-            ActionCardsGrid(
-                dayOfMonth = dayOfMonth,
-                dayOfWeekMonth = dayOfWeekMonth,
-                weatherReport = weatherReport,
-                isCompact = isCompact,
-                onCardClick = { cardId ->
-                    incrementEnergy()
-                    if (cardId == "weather") {
-                        showWeatherDialog = true
-                    } else {
-                        onCardClick(cardId)
-                    }
-                }
-            )
 
             // 4.5 COMPACT MEDIA CONTROL CARD (Shows when media is actively playing)
             CompactMediaCard(

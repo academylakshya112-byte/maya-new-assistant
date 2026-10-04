@@ -92,8 +92,11 @@ fun MayaSettingsScreen(
     var favoriteSong by remember {
         mutableStateOf(prefs.getString("favorite_song", "") ?: "")
     }
+    var personalityEnabled by remember {
+        mutableStateOf(prefs.getBoolean("personality_mode_enabled", true))
+    }
     var selectedPersona by remember {
-        mutableStateOf(prefs.getString("persona_mode", "Maya 💕 (Girlfriend)") ?: "Maya 💕 (Girlfriend)")
+        mutableStateOf(prefs.getString("persona_mode", "MAYA 💕 GIRLFRIEND") ?: "MAYA 💕 GIRLFRIEND")
     }
     var selectedVoice by remember {
         mutableStateOf(prefs.getString("voice_name", "Kore") ?: "Kore")
@@ -466,28 +469,66 @@ fun MayaSettingsScreen(
                     )
                 }
 
-                // 5. CARD: PERSONA 🎭 (EXACTLY 3 SELECTABLE PERSONALITY MODES)
+                // 5. CARD: PERSONA 🎭 (NORMAL MODE + 3 PERSONALITY MODES WITH ON/OFF SWITCH)
                 SettingsCardContainer {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Personality Mode 🎭",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "3 Selectable Modes",
-                            color = Color(0xFFA59DC2),
-                            fontSize = 11.sp
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Personality Mode 🎭",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (personalityEnabled && !selectedPersona.contains("NORMAL", ignoreCase = true)) 
+                                    "ON: ${selectedPersona.take(20)}" 
+                                else 
+                                    "OFF: Normal Mode Active (No babu/sona)",
+                                color = if (personalityEnabled && !selectedPersona.contains("NORMAL", ignoreCase = true)) 
+                                    Color(0xFFFF2A85) 
+                                else 
+                                    Color(0xFF00FF88),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Switch(
+                            checked = personalityEnabled && !selectedPersona.contains("NORMAL", ignoreCase = true),
+                            onCheckedChange = { isChecked ->
+                                personalityEnabled = isChecked
+                                prefs.edit().putBoolean("personality_mode_enabled", isChecked).apply()
+                                if (!isChecked) {
+                                    selectedPersona = "NORMAL MODE"
+                                    prefs.edit().putString("persona_mode", "NORMAL MODE").putString("maya_persona", "NORMAL MODE").apply()
+                                    Toast.makeText(context, "Normal Mode Active 🛡️ (No babu/sona/jaanu)", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    selectedPersona = "MAYA 💕 GIRLFRIEND"
+                                    prefs.edit().putString("persona_mode", "MAYA 💕 GIRLFRIEND").putString("maya_persona", "MAYA 💕 GIRLFRIEND").apply()
+                                    Toast.makeText(context, "Personality Mode ON: Girlfriend 💕", Toast.LENGTH_SHORT).show()
+                                }
+                                com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFFF2A85),
+                                uncheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                                uncheckedTrackColor = Color(0xFF1E1736)
+                            )
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     val personaModes = listOf(
+                        Triple(
+                            "NORMAL MODE",
+                            "Simple, clean & professional assistant — strictly NO babu, sona, or jaanu",
+                            "🛡️"
+                        ),
                         Triple(
                             "MAYA 💕 GIRLFRIEND",
                             "Soft, caring, affectionate, sweet & emotionally expressive",
@@ -507,13 +548,26 @@ fun MayaSettingsScreen(
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         personaModes.forEach { (modeName, modeDesc, modeIcon) ->
-                            val isSelected = selectedPersona.contains(modeName, ignoreCase = true) ||
+                            val isSelected = if (modeName == "NORMAL MODE") {
+                                !personalityEnabled || selectedPersona.contains("NORMAL", ignoreCase = true)
+                            } else {
+                                personalityEnabled && (
+                                    selectedPersona.contains(modeName, ignoreCase = true) ||
                                     (modeName == "MAYA 💕 GIRLFRIEND" && (selectedPersona.contains("Girlfriend", ignoreCase = true) || selectedPersona.contains("Affectionate", ignoreCase = true))) ||
                                     (modeName == "PLAYFUL & NAKHRE" && selectedPersona.contains("Nakhre", ignoreCase = true)) ||
                                     (modeName == "SUPER FRIENDLY" && selectedPersona.contains("Super Friendly", ignoreCase = true))
+                                )
+                            }
 
-                            val borderColor = if (isSelected) Color(0xFFFF2A85) else Color.White.copy(alpha = 0.08f)
-                            val bgColor = if (isSelected) Color(0xFFFF2A85).copy(alpha = 0.12f) else Color(0xFF140F24)
+                            val borderColor = if (isSelected) {
+                                if (modeName == "NORMAL MODE") Color(0xFF00FF88) else Color(0xFFFF2A85)
+                            } else Color.White.copy(alpha = 0.08f)
+
+                            val bgColor = if (isSelected) {
+                                if (modeName == "NORMAL MODE") Color(0xFF00FF88).copy(alpha = 0.12f) else Color(0xFFFF2A85).copy(alpha = 0.12f)
+                            } else Color(0xFF140F24)
+
+                            val accentColor = if (modeName == "NORMAL MODE") Color(0xFF00FF88) else Color(0xFFFF2A85)
 
                             Box(
                                 modifier = Modifier
@@ -523,10 +577,24 @@ fun MayaSettingsScreen(
                                     .border(if (isSelected) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(14.dp))
                                     .clickable {
                                         selectedPersona = modeName
-                                        prefs.edit()
-                                            .putString("persona_mode", modeName)
-                                            .putString("maya_persona", modeName)
-                                            .apply()
+                                        if (modeName == "NORMAL MODE") {
+                                            personalityEnabled = false
+                                            prefs.edit()
+                                                .putBoolean("personality_mode_enabled", false)
+                                                .putString("persona_mode", "NORMAL MODE")
+                                                .putString("maya_persona", "NORMAL MODE")
+                                                .apply()
+                                            Toast.makeText(context, "Normal Mode Active 🛡️ (No babu/sona/jaanu)", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            personalityEnabled = true
+                                            prefs.edit()
+                                                .putBoolean("personality_mode_enabled", true)
+                                                .putString("persona_mode", modeName)
+                                                .putString("maya_persona", modeName)
+                                                .apply()
+                                            Toast.makeText(context, "$modeName Activated 🎭", Toast.LENGTH_SHORT).show()
+                                        }
+                                        com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
                                     }
                                     .padding(14.dp)
                             ) {
@@ -538,7 +606,7 @@ fun MayaSettingsScreen(
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(if (isSelected) Color(0xFFFF2A85).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.06f)),
+                                            .background(if (isSelected) accentColor.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.06f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(text = modeIcon, fontSize = 20.sp)
@@ -556,7 +624,9 @@ fun MayaSettingsScreen(
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = modeDesc,
-                                            color = if (isSelected) Color(0xFFFFD1DC) else Color(0xFF94A3B8),
+                                            color = if (isSelected) {
+                                                if (modeName == "NORMAL MODE") Color(0xFF90EE90) else Color(0xFFFFD1DC)
+                                            } else Color(0xFF94A3B8),
                                             fontSize = 11.5.sp,
                                             lineHeight = 15.sp
                                         )
@@ -570,7 +640,7 @@ fun MayaSettingsScreen(
                                             .clip(CircleShape)
                                             .border(
                                                 width = 2.dp,
-                                                color = if (isSelected) Color(0xFFFF2A85) else Color(0xFF64748B),
+                                                color = if (isSelected) accentColor else Color(0xFF64748B),
                                                 shape = CircleShape
                                             ),
                                         contentAlignment = Alignment.Center
@@ -580,7 +650,7 @@ fun MayaSettingsScreen(
                                                 modifier = Modifier
                                                     .size(10.dp)
                                                     .clip(CircleShape)
-                                                    .background(Color(0xFFFF2A85))
+                                                    .background(accentColor)
                                             )
                                         }
                                     }
@@ -599,14 +669,24 @@ fun MayaSettingsScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    val voices = listOf("Kore", "Aoede", "Puck", "Charon", "Fenrir")
+                    val voices = listOf(
+                        "Aoede",
+                        "Venom",
+                        "Kore",
+                        "Puck",
+                        "Charon",
+                        "Fenrir",
+                        "Jarvis",
+                        "Friday"
+                    )
                     SettingsDropdownField(
                         selectedValue = selectedVoice,
                         options = voices,
-                        onSelect = {
-                            selectedVoice = it
-                            prefs.edit().putString("voice_name", it).apply()
-                            Toast.makeText(context, "Voice set to $it 🎙️", Toast.LENGTH_SHORT).show()
+                        onSelect = { voiceName ->
+                            selectedVoice = voiceName
+                            prefs.edit().putString("voice_name", voiceName).apply()
+                            com.example.ZoyaForegroundService.activeService?.liveSessionManager?.restartSession(greet = false)
+                            Toast.makeText(context, "Voice set to $voiceName 🎙️", Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
